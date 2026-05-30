@@ -39,3 +39,6 @@ lerna-debug.log*
 *.tgz
 *.zip
 .workspace/
+
+# Supabase
+supabase/.temp/
