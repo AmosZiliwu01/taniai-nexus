@@ -12,6 +12,7 @@ import {
   Save, Eye, EyeOff, Bell, Loader2,
   Smartphone, Link2, Link2Off, Copy, Check,
   RefreshCw, CheckCircle2, AlertCircle, X, Maximize2,
+  Construction,
 } from "lucide-react";
 import { INDONESIAN_CITIES } from "@/services/location/locationService";
 import { saveLocation, geocodeCity } from "@/services/location/locationService";
@@ -226,8 +227,6 @@ function WhatsappTab() {
                 <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/40 px-3 py-2.5 text-sm text-emerald-800 dark:text-emerald-200">
                   TaniAI di WhatsApp sudah aktif! Chat ke <span className="font-semibold">{WA_BOT_DISPLAY}</span> kapan saja.
                 </div>
-
-                {/* Tampilkan kode baru jika ada (untuk mengganti nomor) */}
                 {wa.pairingCode && !wa.isExpired && (
                   <div className="rounded-xl border-2 border-primary/30 bg-muted p-4 space-y-3">
                     <p className="text-sm font-semibold flex items-center gap-2"><RefreshCw className="h-4 w-4 text-primary" /> Kode baru untuk mengganti nomor WhatsApp:</p>
@@ -238,7 +237,6 @@ function WhatsappTab() {
                     <p className="text-xs text-muted-foreground">Kirim kode ini ke bot WA untuk mengganti nomor yang terhubung. Berlaku {Math.floor((wa.codeExpiry!.getTime() - Date.now()) / 60000)} menit.</p>
                   </div>
                 )}
-
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-2" onClick={wa.unlink} disabled={wa.isUnlinking}>
                     {wa.isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2Off className="h-4 w-4" />} Putuskan WhatsApp
@@ -319,6 +317,57 @@ const NOTIF_LABELS: Record<NotifKey, { label: string; desc: string }> = {
   ai: { label: "Rekomendasi AI", desc: "Saran pertanian personal dari TaniAI" },
 };
 
+// ─── Coming Soon Modal ────────────────────────────────────────
+function NotifComingSoonModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-card rounded-2xl shadow-2xl max-w-sm w-full p-7 flex flex-col items-center gap-4 border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-muted transition-colors"
+        >
+          <X className="h-4 w-4 text-muted-foreground" />
+        </button>
+
+        {/* Icon */}
+        <div className="rounded-full bg-amber-100 dark:bg-amber-900/30 p-4">
+          <Construction className="h-8 w-8 text-amber-500" />
+        </div>
+
+        {/* Text */}
+        <div className="text-center space-y-1.5">
+          <h3 className="text-lg font-bold">Fitur Segera Hadir! 🚧</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Pengaturan notifikasi masih dalam tahap pengembangan dan belum siap digunakan.
+            Kami sedang mempersiapkannya agar berfungsi dengan sempurna untuk kamu.
+          </p>
+        </div>
+
+        {/* Badge */}
+        <div className="flex items-center gap-2 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-1.5">
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Coming Soon</span>
+        </div>
+
+        <Button
+          variant="outline"
+          className="w-full mt-1"
+          onClick={onClose}
+        >
+          Kembali ke Profil
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN PROFILE ─────────────────────────────────────────────
 function Profile() {
   const qc = useQueryClient();
@@ -327,6 +376,7 @@ function Profile() {
   const [uploading, setUploading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "akun" | "notifikasi" | "whatsapp">("profile");
+  const [showNotifModal, setShowNotifModal] = useState(false);
   const [citySearch, setCitySearch] = useState("");
   const [citySuggestions, setCitySuggestions] = useState<typeof INDONESIAN_CITIES>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -362,7 +412,6 @@ function Profile() {
     },
   });
 
-  // Load profile — with retry if full_name empty (race condition on first load)
   useEffect(() => {
     let retries = 0;
     const maxRetries = 3;
@@ -394,11 +443,9 @@ function Profile() {
           bio: data.bio ?? "",
         });
         setCitySearch(data.location ?? "");
-        // avatar_url: append cache-busting so browser always re-fetches
         if (data.avatar_url) {
           setAvatarUrl(`${data.avatar_url}?t=${Date.now()}`);
         }
-        // Load notification prefs
         const prefs = (data as any).notification_prefs;
         if (prefs && typeof prefs === "object") {
           setNotifPrefs((prev) => ({ ...prev, ...prefs }));
@@ -426,7 +473,6 @@ function Profile() {
         const loc = await geocodeCity(form.location);
         if (loc) saveLocation(loc);
       }
-      // Broadcast to AppShell so header name/avatar updates immediately
       window.dispatchEvent(new Event("profile-updated"));
       toast.success("Profil berhasil disimpan!");
     } catch (e: any) {
@@ -461,14 +507,12 @@ function Profile() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Tidak terautentikasi");
       const ext = file.name.split(".").pop();
-      // Use timestamp to prevent cache from serving old image
       const path = `avatars/${user.id}_${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "no-cache" });
       if (upErr) throw new Error("Gagal upload foto: " + upErr.message);
       const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
       await supabase.from("profiles").update({ avatar_url: publicUrl, updated_at: new Date().toISOString() } as any).eq("id", user.id);
       setAvatarUrl(`${publicUrl}?t=${Date.now()}`);
-      // Broadcast so AppShell header avatar also updates
       window.dispatchEvent(new Event("profile-updated"));
       toast.success("Foto profil diperbarui!");
     } catch (e: any) {
@@ -496,6 +540,22 @@ function Profile() {
     }
   };
 
+  // Handler for tab click — intercept notifikasi
+  const handleTabClick = (tabId: typeof activeTab) => {
+    if (tabId === "notifikasi") {
+      setShowNotifModal(true);
+      // Don't switch tab
+      return;
+    }
+    setActiveTab(tabId);
+  };
+
+  // When modal closes, ensure we're on profile tab
+  const handleNotifModalClose = () => {
+    setShowNotifModal(false);
+    setActiveTab("profile");
+  };
+
   const initials = (form.full_name || email || "U").slice(0, 2).toUpperCase();
   const activePlants = plants.filter((p) => p.status === "Aktif");
 
@@ -508,6 +568,9 @@ function Profile() {
 
   return (
     <div className="space-y-6">
+      {/* Coming Soon Modal */}
+      {showNotifModal && <NotifComingSoonModal onClose={handleNotifModalClose} />}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Pengaturan Akun</h1>
         <p className="text-sm text-muted-foreground">Kelola profil dan preferensi Anda</p>
@@ -574,15 +637,23 @@ function Profile() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => handleTabClick(t.id)}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors",
-              activeTab === t.id ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors relative",
+              activeTab === t.id && t.id !== "notifikasi"
+                ? "bg-card shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+              t.id === "notifikasi" && "opacity-60"
             )}
           >
             <t.icon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t.label}</span>
             <span className="sm:hidden">{t.label.split(" ")[0]}</span>
+            {t.id === "notifikasi" && (
+              <span className="hidden sm:inline-flex items-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold text-white leading-none ml-1">
+                Soon
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -711,9 +782,9 @@ function Profile() {
         </div>
       )}
 
-      {/* Tab: Notifikasi */}
+      {/* Tab: Notifikasi — rendered blurred behind modal */}
       {activeTab === "notifikasi" && (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-card pointer-events-none select-none blur-sm opacity-60">
           <h2 className="font-semibold flex items-center gap-2 mb-1"><Bell className="h-4 w-4 text-primary" /> Preferensi Notifikasi</h2>
           <p className="text-xs text-muted-foreground mb-4">Pengaturan ini menentukan jenis notifikasi yang akan masuk ke ikon notifikasi di header.</p>
           <div className="space-y-4">
@@ -723,22 +794,10 @@ function Profile() {
                   <p className="text-sm font-semibold">{NOTIF_LABELS[key].label}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{NOTIF_LABELS[key].desc}</p>
                 </div>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={notifPrefs[key]}
-                    onChange={(e) => setNotifPrefs((prev) => ({ ...prev, [key]: e.target.checked }))}
-                    className="peer sr-only"
-                  />
-                  <div className="h-5 w-9 rounded-full bg-muted transition-colors peer-checked:bg-primary after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
-                </label>
+                <div className="h-5 w-9 rounded-full bg-muted" />
               </div>
             ))}
           </div>
-          <Button className="mt-4 w-full gap-2" onClick={handleSaveNotifPrefs} disabled={notifSaving}>
-            {notifSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Simpan Preferensi
-          </Button>
         </div>
       )}
 

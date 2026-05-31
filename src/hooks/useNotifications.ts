@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Notification {
@@ -13,6 +13,8 @@ export interface Notification {
 
 export function useNotifications() {
   const qc = useQueryClient();
+  // Ref untuk track apakah subscription sudah aktif — mencegah double subscribe
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const query = useQuery({
     queryKey: ["notifications"],
@@ -60,12 +62,26 @@ export function useNotifications() {
   });
 
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      channel = supabase
-        .channel("notifications-realtime")
+      if (!user || cancelled) return;
+
+      // Kalau sudah ada channel aktif, jangan buat lagi
+      if (channelRef.current) return;
+
+      // Pakai nama channel unik per user agar tidak konflik
+      const channelName = `notifications-realtime-${user.id}`;
+
+      // Hapus channel lama dengan nama sama kalau ada (dari session sebelumnya)
+      supabase.getChannels().forEach((ch) => {
+        if (ch.topic === `realtime:${channelName}`) {
+          supabase.removeChannel(ch);
+        }
+      });
+
+      const channel = supabase
+        .channel(channelName)
         .on(
           "postgres_changes",
           {
@@ -79,12 +95,19 @@ export function useNotifications() {
           }
         )
         .subscribe();
+
+      channelRef.current = channel;
     });
 
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      cancelled = true;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [qc]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);  // Hanya run sekali — qc tidak perlu jadi dependency karena stabil
 
   const unreadCount = (query.data ?? []).filter((n) => !n.is_read).length;
 
@@ -144,17 +167,14 @@ export function getNotificationLink(notification: Notification): string {
   const type = notification.type;
   const body = notification.body || "";
 
-  // Cek apakah ada POST_ID di body (format: POST_ID:uuid)
   const postIdMatch = body.match(/POST_ID:([a-f0-9-]+)/);
   const postId = postIdMatch ? postIdMatch[1] : null;
 
   switch (type) {
     case "community":
-      // Jika ada POST_ID, langsung ke postingan tersebut di halaman komunitas
       return postId ? `/community?post=${postId}` : "/community";
     case "warning":
     case "success":
-      // Jika ada POST_ID (misal dari laporan/peringatan postingan), arahkan ke komunitas
       if (postId) return `/community?post=${postId}`;
       return "/dashboard";
     case "diagnosis":

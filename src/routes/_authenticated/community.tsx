@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import Swal from "sweetalert2";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWeatherSummary, useWeather } from "@/hooks/useWeather";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +57,7 @@ interface Post {
   likes_count: number;
   comments_count: number;
   is_flagged: boolean;
+  flagged_reason: string | null;
   created_at: string;
   author?: { full_name: string | null; avatar_url: string | null };
   liked_by_me?: boolean;
@@ -311,7 +313,7 @@ function CommentItem({ comment, postId, currentUserId, onReply, depth = 0, isExp
         <div className="flex items-center gap-3 mt-1 px-1 flex-wrap">
           <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(parseISO(comment.created_at), { addSuffix: true, locale: idLocale })}</span>
           <button onClick={handleReplyClick} className="text-[10px] font-semibold text-muted-foreground hover:text-primary flex items-center gap-0.5"><Reply className="h-3 w-3" /> Balas</button>
-          {isOwn && <button onClick={() => { if (confirm("Hapus komentar ini?")) deleteComment.mutate(); }} className="text-[10px] font-semibold text-muted-foreground hover:text-destructive">Hapus</button>}
+          {isOwn && <button onClick={async () => { const result = await Swal.fire({ icon: "warning", title: "Hapus Komentar?", text: "Komentar yang dihapus tidak bisa dipulihkan.", confirmButtonText: "Ya, Hapus", cancelButtonText: "Batal", showCancelButton: true, confirmButtonColor: "#dc2626", cancelButtonColor: "#6b7280", customClass: { popup: "!rounded-2xl !font-sans", confirmButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold", cancelButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold" }, reverseButtons: true }); if (result.isConfirmed) deleteComment.mutate(); }} className="text-[10px] font-semibold text-muted-foreground hover:text-destructive">Hapus</button>}
           {hasReplies && depth === 0 && (
             <button onClick={() => onToggleExpand(comment.id)} className="ml-auto text-[10px] font-semibold text-primary flex items-center gap-0.5">
               {isExpanded ? <><ChevronUp className="h-3 w-3" /> Sembunyikan</> : <><ChevronDown className="h-3 w-3" /> {comment.replies.length} balasan</>}
@@ -731,32 +733,32 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !reason) throw new Error("Alasan diperlukan");
 
+      // Cek apakah reporter adalah admin
       const { data: reporterRole } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
       const reporterIsAdmin = !!reporterRole;
 
-      const { data: ownerRole } = await supabase.from("user_roles").select("role").eq("user_id", post.user_id).eq("role", "admin").maybeSingle();
-      const ownerIsAdmin = !!ownerRole;
-
       if (reporterIsAdmin) {
+        // Admin melapor → langsung flag postingan
         await supabase.from("community_posts").update({ is_flagged: true, flagged_reason: reason }).eq("id", post.id);
+        // Notif ⚠️ ke pemilik dikirim langsung karena admin sudah memastikan pelanggaran
+        // type: "warning" agar masuk wa_sent pipeline + tidak terfilter prefs
         await supabase.from("notifications").insert({
           user_id: post.user_id,
-          title: "🚨 Postingan Anda Dilaporkan",
-          body: `POST_ID:${post.id}\nPostingan \"${post.title}\" dilaporkan oleh admin karena: ${reason}. Harap perbarui konten Anda agar tanda dihapus.`,
-          type: "community",
+          title: "⚠️ Postingan Anda Ditandai Admin",
+          body: `POST_ID:${post.id}
+Postingan "${post.title}" ditandai oleh admin karena: ${reason}. Harap perbarui konten Anda agar tanda dihapus.`,
+          type: "warning",
         });
-      } else if (ownerIsAdmin) {
-        await supabase.from("notifications").insert({
-          user_id: post.user_id,
-          title: "🚩 Postingan Anda Dilaporkan User",
-          body: `POST_ID:${post.id}\nPostingan \"${post.title}\" dilaporkan oleh pengguna dengan alasan: ${reason}.`,
-          type: "community",
-        });
+        // status: "resolved" → trigger DB tidak kirim notif 🚨 ke admin lain
+        await supabase.from("content_reports").insert({ reporter_id: user.id, post_id: post.id, reason, status: "resolved" });
       } else {
+        // User biasa → HANYA masuk content_reports, tunggu admin review
+        // DB trigger notify_admins_new_report akan kirim notif 🚨 ke admin
+        // Pemilik post TIDAK dapat notif sampai admin approve laporan
         await supabase.from("content_reports").insert({ reporter_id: user.id, post_id: post.id, reason });
       }
     },
-    onSuccess: () => { setShowReportModal(false); toast.success("Laporan terkirim"); },
+    onSuccess: () => { setShowReportModal(false); toast.success("Laporan berhasil dikirim. Tim kami akan meninjau laporan Anda."); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -791,7 +793,31 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{authorName}</span>
                   <CategoryBadge category={post.category} />
-                  {post.is_flagged && <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-semibold text-destructive border border-destructive/10">Ditinjau</span>}
+                  {post.is_flagged && (
+                    isOwn ? (
+                      <span
+                        className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-semibold text-destructive border border-destructive/10 cursor-pointer hover:bg-destructive/20 transition-colors"
+                        title={post.flagged_reason ? `Alasan: ${post.flagged_reason}` : "Postingan ini sedang ditinjau oleh admin"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          Swal.fire({
+                            icon: "warning",
+                            title: "Postinganmu Ditandai",
+                            html: post.flagged_reason
+                              ? `<p>Postinganmu ditandai oleh admin dengan alasan:</p><p class="mt-2 font-semibold text-destructive">${post.flagged_reason}</p><p class="mt-3 text-sm text-muted-foreground">Perbarui konten untuk menghapus tanda ini.</p>`
+                              : "<p>Postinganmu sedang ditinjau oleh admin.</p>",
+                            confirmButtonText: "Mengerti",
+                            confirmButtonColor: "#d97706",
+                            customClass: { popup: "!rounded-2xl !font-sans", confirmButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold" },
+                          });
+                        }}
+                      >
+                        ⚠️ Ditinjau
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-semibold text-destructive border border-destructive/10">Ditinjau</span>
+                    )
+                  )}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {formatDistanceToNow(parseISO(post.created_at), { addSuffix: true, locale: idLocale })}
@@ -806,7 +832,7 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
                     <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                     <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-xl border border-border bg-card shadow-elevated py-1">
                       <button onClick={() => { setMenuOpen(false); setEditTitle(post.title); setEditContent(post.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"><Edit className="h-3.5 w-3.5" /> Update postingan</button>
-                      <button onClick={() => { if (confirm("Hapus postingan ini?")) deletePost.mutate(); setMenuOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Hapus postingan</button>
+                      <button onClick={async () => { setMenuOpen(false); const result = await Swal.fire({ icon: "warning", title: "Hapus Postingan?", text: "Postingan yang dihapus tidak bisa dipulihkan.", confirmButtonText: "Ya, Hapus", cancelButtonText: "Batal", showCancelButton: true, confirmButtonColor: "#dc2626", cancelButtonColor: "#6b7280", customClass: { popup: "!rounded-2xl !font-sans", confirmButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold", cancelButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold" }, reverseButtons: true }); if (result.isConfirmed) deletePost.mutate(); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Hapus postingan</button>
                     </div>
                   </>
                 )}
@@ -931,7 +957,7 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Update Postingan</h3>
-              {post.is_flagged && <span className="text-xs rounded-full bg-warning/20 text-warning px-2 py-0.5 border border-warning/30">⚠️ Postingan ditandai — simpan untuk hapus tanda</span>}
+              {post.is_flagged && <span className="text-xs rounded-full bg-warning/20 text-warning px-2 py-0.5 border border-warning/30">⚠️ Postingan ditandai — perbarui untuk hapus tanda</span>}
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Judul</label>

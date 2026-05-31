@@ -252,28 +252,34 @@ function Admin() {
   // Jika pelapor adalah admin, flagPost sudah mengirim notifikasi — skip agar tidak double
   const approveReport = useMutation({
     mutationFn: async (report: any) => {
+      // 1. Tandai laporan sebagai resolved
       await supabase.from("content_reports").update({ status: "resolved" }).eq("id", report.id);
-      if (report.post_id) {
-        // Cek apakah pelapor adalah admin
-        const { data: reporterRole } = await supabase.from("user_roles").select("role").eq("user_id", report.reporter_id).eq("role", "admin").maybeSingle();
-        const reporterIsAdmin = !!reporterRole;
 
+      if (report.post_id) {
+        // 2. Flag postingan
         await supabase.from("community_posts").update({ is_flagged: true, flagged_reason: report.reason }).eq("id", report.post_id);
 
-        // Hanya kirim notifikasi jika pelapor bukan admin (admin sudah langsung notif via flagPost)
-        if (!reporterIsAdmin) {
-          const { data: post } = await supabase.from("community_posts").select("id, user_id, title").eq("id", report.post_id).maybeSingle();
-          if (post) {
-            await pushNotification(post.user_id, {
-              title: "🚨 Postingan Dilaporkan",
-              body: `POST_ID:${report.post_id}\nPostingan Anda "${post.title}" dilaporkan karena: ${report.reason}. Postingan ditandai — perbarui konten untuk menghapus tanda.`,
-              type: "community",
-            });
-          }
+        // 3. Ambil data post untuk notif ke pemilik
+        const { data: post } = await supabase.from("community_posts").select("id, user_id, title").eq("id", report.post_id).maybeSingle();
+
+        if (post) {
+          // Kirim notif ⚠️ ke pemilik postingan — HANYA setelah admin approve
+          // type: "warning" agar selalu tampil (tidak terfilter prefs) + masuk WA pipeline
+          await pushNotification(post.user_id, {
+            title: "⚠️ Postingan Anda Ditandai",
+            body: `POST_ID:${report.post_id}
+Postingan Anda "${post.title}" telah ditinjau dan ditandai oleh admin karena: ${report.reason}. Perbarui konten untuk menghapus tanda.`,
+            type: "warning",
+          });
         }
       }
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-reports"] }); qc.invalidateQueries({ queryKey: ["admin-posts"] }); qc.invalidateQueries({ queryKey: ["admin-stats"] }); toast.success("Laporan disetujui — postingan ditandai & user dinotifikasi"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-reports"] });
+      qc.invalidateQueries({ queryKey: ["admin-posts"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      toast.success("Laporan disetujui — postingan ditandai & pemilik dinotifikasi");
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
