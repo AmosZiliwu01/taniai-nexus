@@ -5,7 +5,7 @@ export function Logo({ className, showText = true }: { className?: string; showT
   return (
     <Link to="/" className={cn("flex items-center gap-2.5", className)}>
       <img
-        src="https://zgiomlixpneyvujipplh.supabase.co/storage/v1/object/public/assets/WhatsApp%20Image%202026-05-31%20at%2005.32.00.jpeg"
+        src="https://zgiomlixpneyvujipplh.supabase.co/storage/v1/object/public/assets/logo-tani-ai-nexus.jpeg"
         alt="TaniAI Nexus Logo"
         className="h-9 w-9 rounded-full object-cover"
       />

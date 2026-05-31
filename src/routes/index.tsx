@@ -8,13 +8,34 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "TaniAI Nexus — Platform AI Pertanian Indonesia" },
-      { name: "description", content: "Diagnosis penyakit tanaman, asisten AI, cuaca, komunitas, dan edukasi untuk petani Indonesia." },
+      { name: "description", content: "Diagnosis penyakit tanaman dari foto, tanya AI asisten pertanian, cek cuaca, dan diskusi di komunitas petani Indonesia. Gratis!" },
+      { name: "keywords", content: "pertanian, AI, diagnosa tanaman, penyakit tanaman, petani Indonesia, asisten pertanian, cuaca pertanian" },
+      { name: "author", content: "TaniAI Nexus" },
+      { name: "viewport", content: "width=device-width, initial-scale=1.0" },
+      // Open Graph (untuk share ke WhatsApp, Facebook, Twitter)
+      { property: "og:title", content: "TaniAI Nexus — Platform AI Pertanian Indonesia" },
+      { property: "og:description", content: "Diagnosis penyakit tanaman dari foto dengan AI. Gratis untuk petani Indonesia!" },
+      { property: "og:image", content: "https://tani-ai-nexus.vercel.app/og-image.jpg" },
+      { property: "og:url", content: "https://tani-ai-nexus.vercel.app/" },
+      { property: "og:type", content: "website" },
+      // Twitter Card
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "TaniAI Nexus — Platform AI Pertanian Indonesia" },
+      { name: "twitter:description", content: "Diagnosis penyakit tanaman dari foto dengan AI. Gratis!" },
+      { name: "twitter:image", content: "https://tani-ai-nexus.vercel.app/og-image.jpg" },
+    ],
+    links: [
+      { rel: "icon", type: "image/x-icon", href: "favicon/favicon.ico" },
+      { rel: "shortcut icon", type: "image/x-icon", href: "favicon/favicon.ico" },
+      { rel: "icon", type: "image/png", href: "favicon/favicon.png" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "favicon/apple-touch-icon.png" },
+      { rel: "manifest", href: "favicon/site.webmanifest" },
+      { rel: "canonical", href: "https://tani-ai-nexus.vercel.app/" },
     ],
   }),
   component: Landing,
 });
 
-// Semua fitur dalam satu array (termasuk Analytics dengan status "Tersedia" untuk menjaga konsistensi UI, meskipun sebenarnya belum aktif) --- IGNORE ---
 const features = [
   { icon: Leaf, title: "Diagnosa Tanaman", desc: "Diagnosis penyakit dari foto daun, batang, atau buah dengan AI canggih.", active: true },
   { icon: MessageCircle, title: "AI Assistant", desc: "Tanya jawab seputar pertanian 24/7 dengan AI yang memahami bahasa Indonesia.", active: true },

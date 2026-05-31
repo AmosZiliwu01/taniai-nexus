@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /register
+Disallow: /admin
+Disallow: /profile
+Disallow: /api/
+Allow: /community
+Allow: /articles
+Allow: /plant-doctor
+Allow: /weather
+Allow: /assistant
+
+Sitemap: https://tani-ai-nexus.vercel.app/sitemap.xml
