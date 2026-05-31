@@ -52,7 +52,7 @@ const WEATHER_CONDITIONS = ["Cerah", "Cerah Berawan", "Berawan", "Hujan Ringan",
 
 const PLANT_TYPES = [
   "Padi", "Jagung", "Cabai", "Tomat", "Terung", "Kedelai",
-  "Bawang Merah", "Bawang Putih", "Kentang", "Singkong", "Pisang", "Mangga", "Jeruk", "Lainnya",
+  "Bawang Merah", "Bawang Putih", "Kentang", "Singkong", "Pisang", "Mangga", "Jeruk", "Kopi", "Kakao", "Kacang Tanah", "Gandum", "Bayam", "Kangkung", "Sawi",
 ];
 
 const PLANT_PARTS = [
@@ -536,9 +536,6 @@ function DiagnosaTanaman() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // ── Bagikan ke Komunitas ───────────────────────────────────────────────────
-  // Menggunakan shareKey unik (timestamp) sebagai trigger reaktif di community.tsx
-  // agar form langsung terbuka meski komponen Community tidak di-remount.
   const handleShare = async () => {
     if (!activeResult) return;
     const severity = activeResult.severity;
@@ -561,17 +558,10 @@ function DiagnosaTanaman() {
         plantPart: partText,
       });
       toast.dismiss("share-ai");
-
-      // Buat shareKey unik berdasarkan timestamp
-      const shareKey = `share_${Date.now()}`;
-
-      // Simpan data preset ke sessionStorage
       sessionStorage.setItem("share_preset_content", content);
-      sessionStorage.setItem("share_preset_image", activeImageUrl ?? "");
-      sessionStorage.setItem("share_preset_key", shareKey);
-
-      // Navigate ke komunitas dengan shareKey di search params sebagai trigger reaktif
-      navigate({ to: "/community", search: { shareKey } as any });
+      if (activeImageUrl) sessionStorage.setItem("share_preset_image", activeImageUrl);
+      else sessionStorage.removeItem("share_preset_image");
+      navigate({ to: "/community", search: { share: Date.now().toString() } });
     } catch (error) {
       toast.dismiss("share-ai");
       toast.error("Gagal menghasilkan teks, coba lagi nanti.");
