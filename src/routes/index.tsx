@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Leaf, MessageCircle, CloudSun, BarChart3, Sparkles, Check, Star, Users, BookOpen, ClipboardList } from "lucide-react";
 import heroImg from "@/assets/hero-ai-farming.jpg";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowRight, BarChart3, BookOpen, Check, CloudSun, Leaf, MessageCircle, Sparkles, Star, Users } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,12 +25,15 @@ export const Route = createFileRoute("/")({
       { name: "twitter:image", content: "https://tani-ai-nexus.vercel.app/og-image.jpg" },
     ],
     links: [
-      { rel: "icon", type: "image/x-icon", href: "favicon/favicon.ico" },
-      { rel: "shortcut icon", type: "image/x-icon", href: "favicon/favicon.ico" },
-      { rel: "icon", type: "image/png", href: "favicon/favicon.png" },
-      { rel: "apple-touch-icon", sizes: "180x180", href: "favicon/apple-touch-icon.png" },
-      { rel: "manifest", href: "favicon/site.webmanifest" },
+      { rel: "icon", type: "image/x-icon", href: "favicon.ico" },
+      { rel: "shortcut icon", type: "image/x-icon", href: "favicon.ico" },
+      { rel: "icon", type: "image/png", href: "favicon.png" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "apple-touch-icon.png" },
+      { rel: "manifest", href: "site.webmanifest" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "android-chrome-192x192.png" },
+      { rel: "icon", type: "image/png", sizes: "512x512", href: "android-chrome-512x512.png" },
       { rel: "canonical", href: "https://tani-ai-nexus.vercel.app/" },
+
     ],
   }),
   component: Landing,
