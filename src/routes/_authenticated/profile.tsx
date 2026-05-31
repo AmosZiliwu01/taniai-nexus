@@ -76,6 +76,16 @@ function useWhatsappLink() {
     staleTime: 0,
   });
 
+  // 🔁 Auto-clear pairing code ketika status sudah linked
+  useEffect(() => {
+    if (status?.linked && pairingCode) {
+      setPairingCode(null);
+      setCodeExpiry(null);
+      clearPairingFromStorage();
+      qc.invalidateQueries({ queryKey: ["wa-link-status"] });
+    }
+  }, [status?.linked, pairingCode, qc]);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
 
@@ -84,7 +94,8 @@ function useWhatsappLink() {
     try {
       const data = await apiFetch("/api/pairing/generate", "POST");
       const expiry = new Date(Date.now() + data.expiresInMinutes * 60 * 1000);
-      setPairingCode(data.code); setCodeExpiry(expiry);
+      setPairingCode(data.code);
+      setCodeExpiry(expiry);
       savePairingToStorage(data.code, expiry);
       toast.success("Kode berhasil dibuat!");
     } catch { toast.error("Gagal membuat kode pairing. Pastikan API server berjalan."); }
@@ -95,7 +106,9 @@ function useWhatsappLink() {
     setIsUnlinking(true);
     try {
       await apiFetch("/api/pairing/unlink", "POST");
-      setPairingCode(null); setCodeExpiry(null); clearPairingFromStorage();
+      setPairingCode(null);
+      setCodeExpiry(null);
+      clearPairingFromStorage();
       qc.invalidateQueries({ queryKey: ["wa-link-status"] });
       toast.success("WhatsApp berhasil diputuskan.");
     } catch { toast.error("Gagal memutuskan WhatsApp."); }
@@ -104,14 +117,25 @@ function useWhatsappLink() {
 
   const isExpired = codeExpiry ? new Date() > codeExpiry : false;
   useEffect(() => {
-    if (isExpired && pairingCode) { setPairingCode(null); setCodeExpiry(null); clearPairingFromStorage(); }
+    if (isExpired && pairingCode) {
+      setPairingCode(null);
+      setCodeExpiry(null);
+      clearPairingFromStorage();
+    }
   }, [isExpired, pairingCode]);
 
   return {
-    isLinked: status?.linked ?? false, phoneNumber: status?.phoneNumber ?? null,
-    statusLoading: isLoading, refetch,
-    pairingCode: isExpired ? null : pairingCode, codeExpiry, isExpired,
-    generate, isGenerating, unlink, isUnlinking,
+    isLinked: status?.linked ?? false,
+    phoneNumber: status?.phoneNumber ?? null,
+    statusLoading: isLoading,
+    refetch,
+    pairingCode: isExpired ? null : pairingCode,
+    codeExpiry,
+    isExpired,
+    generate,
+    isGenerating,
+    unlink,
+    isUnlinking,
   };
 }
 
@@ -199,8 +223,18 @@ function WhatsappTab() {
                   <div className="rounded-xl bg-emerald-500 p-2 shrink-0"><CheckCircle2 className="h-4 w-4 text-white" /></div>
                   <div><p className="font-semibold text-emerald-900 dark:text-emerald-100">WhatsApp Terhubung ✓</p><p className="text-sm text-emerald-700 dark:text-emerald-300">Nomor: <span className="font-mono font-semibold">{wa.phoneNumber ?? "tersembunyi"}</span></p></div>
                 </div>
-                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/40 px-3 py-2.5 text-sm text-emerald-800 dark:text-emerald-200">TaniAI di WhatsApp sudah aktif! Chat ke <span className="font-semibold">{WA_BOT_DISPLAY}</span> kapan saja.</div>
-                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-2" onClick={wa.unlink} disabled={wa.isUnlinking}>{wa.isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2Off className="h-4 w-4" />} Putuskan WhatsApp</Button>
+                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/40 px-3 py-2.5 text-sm text-emerald-800 dark:text-emerald-200">
+                  TaniAI di WhatsApp sudah aktif! Chat ke <span className="font-semibold">{WA_BOT_DISPLAY}</span> kapan saja.
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-2" onClick={wa.unlink} disabled={wa.isUnlinking}>
+                    {wa.isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2Off className="h-4 w-4" />} Putuskan WhatsApp
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={wa.generate} disabled={wa.isGenerating}>
+                    {wa.isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Buat Kode Baru
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">*Kode baru dapat digunakan untuk mengganti nomor WhatsApp yang terhubung.</p>
               </div>
             ) : (
               <div className="space-y-4">
