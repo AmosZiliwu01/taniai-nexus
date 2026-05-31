@@ -218,7 +218,7 @@ function WhatsappTab() {
             {wa.statusLoading ? (
               <div className="flex items-center gap-3 text-muted-foreground h-full"><Loader2 className="h-4 w-4 animate-spin" /><span className="text-sm">Mengecek status...</span></div>
             ) : wa.isLinked ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="rounded-xl bg-emerald-500 p-2 shrink-0"><CheckCircle2 className="h-4 w-4 text-white" /></div>
                   <div><p className="font-semibold text-emerald-900 dark:text-emerald-100">WhatsApp Terhubung ✓</p><p className="text-sm text-emerald-700 dark:text-emerald-300">Nomor: <span className="font-mono font-semibold">{wa.phoneNumber ?? "tersembunyi"}</span></p></div>
@@ -226,6 +226,19 @@ function WhatsappTab() {
                 <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/40 px-3 py-2.5 text-sm text-emerald-800 dark:text-emerald-200">
                   TaniAI di WhatsApp sudah aktif! Chat ke <span className="font-semibold">{WA_BOT_DISPLAY}</span> kapan saja.
                 </div>
+
+                {/* Tampilkan kode baru jika ada (untuk mengganti nomor) */}
+                {wa.pairingCode && !wa.isExpired && (
+                  <div className="rounded-xl border-2 border-primary/30 bg-muted p-4 space-y-3">
+                    <p className="text-sm font-semibold flex items-center gap-2"><RefreshCw className="h-4 w-4 text-primary" /> Kode baru untuk mengganti nomor WhatsApp:</p>
+                    <div className="flex items-center gap-3">
+                      <code className="text-lg font-mono font-bold tracking-widest text-primary flex-1">LINK {wa.pairingCode}</code>
+                      <Button size="sm" variant="outline" onClick={handleCopy} className="shrink-0 gap-1">{copied ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Disalin</> : <><Copy className="h-3.5 w-3.5" /> Salin</>}</Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Kirim kode ini ke bot WA untuk mengganti nomor yang terhubung. Berlaku {Math.floor((wa.codeExpiry!.getTime() - Date.now()) / 60000)} menit.</p>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-2" onClick={wa.unlink} disabled={wa.isUnlinking}>
                     {wa.isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2Off className="h-4 w-4" />} Putuskan WhatsApp
