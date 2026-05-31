@@ -537,36 +537,44 @@ function DiagnosaTanaman() {
   });
 
   const handleShare = async () => {
-    if (!activeResult) return;
-    const severity = activeResult.severity;
-    if (severity !== "Ringan" && severity !== "Sedang" && severity !== "Berat") {
-      toast.info("Diagnosa ini tidak dapat dibagikan karena tingkat keparahan tidak diketahui.");
-      return;
-    }
-    const finalPlant = plantType === "Lainnya" ? customPlant : plantType;
-    const partText = plantPart || "";
-    const diagnosisText = activeResult.diagnosis || "tidak teridentifikasi";
-    const symptomsList = activeResult.symptoms?.slice(0, 3) ?? [];
+  if (!activeResult) return;
+  const severity = activeResult.severity;
+  if (severity !== "Ringan" && severity !== "Sedang" && severity !== "Berat") {
+    toast.info("Diagnosa ini tidak dapat dibagikan karena tingkat keparahan tidak diketahui.");
+    return;
+  }
+  const finalPlant = plantType === "Lainnya" ? customPlant : plantType;
+  const partText = plantPart || "";
+  const diagnosisText = activeResult.diagnosis || "tidak teridentifikasi";
+  const symptomsList = activeResult.symptoms?.slice(0, 3) ?? [];
 
-    toast.loading("AI sedang menyiapkan teks postingan...", { id: "share-ai" });
-    try {
-      const content = await generateDiagnosisShareText({
-        plantName: finalPlant,
-        diseaseName: diagnosisText,
-        severity: severity,
-        symptoms: symptomsList,
-        plantPart: partText,
-      });
-      toast.dismiss("share-ai");
-      sessionStorage.setItem("share_preset_content", content);
-      if (activeImageUrl) sessionStorage.setItem("share_preset_image", activeImageUrl);
-      else sessionStorage.removeItem("share_preset_image");
-      navigate({ to: "/community", search: { share: Date.now().toString() } });
-    } catch (error) {
-      toast.dismiss("share-ai");
-      toast.error("Gagal menghasilkan teks, coba lagi nanti.");
-    }
-  };
+  toast.loading("AI sedang menyiapkan teks postingan...", { id: "share-ai" });
+  try {
+    const content = await generateDiagnosisShareText({
+      plantName: finalPlant,
+      diseaseName: diagnosisText,
+      severity: severity,
+      symptoms: symptomsList,
+      plantPart: partText,
+    });
+    toast.dismiss("share-ai");
+    
+    // 🔁 Buat shareKey unik
+    const shareKey = `share_${Date.now()}`;
+    
+    // Simpan data ke sessionStorage
+    sessionStorage.setItem("share_preset_content", content);
+    sessionStorage.setItem("share_preset_key", shareKey);
+    if (activeImageUrl) sessionStorage.setItem("share_preset_image", activeImageUrl);
+    else sessionStorage.removeItem("share_preset_image");
+    
+    // Navigate dengan parameter shareKey (bukan share)
+    navigate({ to: "/community", search: { shareKey } });
+  } catch (error) {
+    toast.dismiss("share-ai");
+    toast.error("Gagal menghasilkan teks, coba lagi nanti.");
+  }
+};
 
   const deleteHistory = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("plant_diagnoses").delete().eq("id", id); if (error) throw error; },
