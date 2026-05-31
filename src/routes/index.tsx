@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Leaf, MessageCircle, CloudSun, BarChart3, ShoppingBag, Sparkles, Check, Star } from "lucide-react";
+import { ArrowRight, Leaf, MessageCircle, CloudSun, BarChart3, Sparkles, Check, Star, Users, BookOpen, ClipboardList } from "lucide-react";
 import heroImg from "@/assets/hero-ai-farming.jpg";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -8,37 +8,39 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "TaniAI Nexus — Platform AI Pertanian Indonesia" },
-      { name: "description", content: "Diagnosis penyakit tanaman, asisten AI, cuaca, dan marketplace untuk petani Indonesia." },
+      { name: "description", content: "Diagnosis penyakit tanaman, asisten AI, cuaca, komunitas, dan edukasi untuk petani Indonesia." },
     ],
   }),
   component: Landing,
 });
 
+// Semua fitur dalam satu array (termasuk Analytics dengan status "Tersedia" untuk menjaga konsistensi UI, meskipun sebenarnya belum aktif) --- IGNORE ---
 const features = [
-  { icon: Leaf, title: "AI Plant Doctor", desc: "Diagnosis penyakit hanya dari foto daun, batang, atau buah." },
-  { icon: MessageCircle, title: "AI Assistant", desc: "Tanya jawab pertanian Indonesia 24/7 dengan AI cerdas." },
-  { icon: CloudSun, title: "Cuaca & Peringatan", desc: "Prediksi 7 hari dan peringatan dini risiko penyakit." },
-  { icon: Sparkles, title: "Soil Analyzer", desc: "Rekomendasi pupuk dan tanaman dari analisis tanah." },
-  { icon: ShoppingBag, title: "Marketplace", desc: "Jual hasil panen langsung ke pasar yang lebih luas." },
-  { icon: BarChart3, title: "Analytics", desc: "Lacak kesehatan tanaman dan tren penyakit." },
+  { icon: Leaf, title: "Diagnosa Tanaman", desc: "Diagnosis penyakit dari foto daun, batang, atau buah dengan AI canggih.", active: true },
+  { icon: MessageCircle, title: "AI Assistant", desc: "Tanya jawab seputar pertanian 24/7 dengan AI yang memahami bahasa Indonesia.", active: true },
+  { icon: CloudSun, title: "Cuaca & Peringatan", desc: "Info cuaca real-time dan peringatan dini risiko penyakit tanaman.", active: true },
+  { icon: Users, title: "Komunitas Petani", desc: "Berbagi pengalaman dan solusi dengan sesama petani Indonesia.", active: true },
+  { icon: BookOpen, title: "Pusat Edukasi", desc: "Artikel pertanian, panduan, dan tips dari pakar.", active: true },
+  { icon: BarChart3, title: "Analytics", desc: "Statistik hasil panen dan tren penyakit.", active: false },
 ];
 
 const steps = [
-  { n: "01", t: "Daftar gratis", d: "Buat akun TaniAI dalam 30 detik." },
+  { n: "01", t: "Daftar gratis", d: "Buat akun TaniAI Nexus dalam 30 detik." },
   { n: "02", t: "Foto tanaman", d: "Unggah foto daun/buah untuk diagnosis instan." },
-  { n: "03", t: "Aksi AI", d: "Ikuti rekomendasi AI dan jual hasil panen." },
+  { n: "03", t: "Aksi AI", d: "Ikuti rekomendasi AI dan diskusi di komunitas." },
 ];
 
 const testimonials = [
   { name: "Budi S.", role: "Petani Cabai, Sleman", text: "Diagnosis penyakit super cepat. Panen saya naik 30% musim ini." },
   { name: "Sri W.", role: "Petani Tomat, Magelang", text: "Asisten AI menjawab seperti penyuluh pertanian profesional." },
-  { name: "Hadi P.", role: "Petani Padi, Klaten", text: "Marketplace bantu saya menjual langsung tanpa tengkulak." },
+  { name: "Hadi P.", role: "Petani Padi, Klaten", text: "Komunitas sangat membantu, banyak solusi dari petani lain." },
 ];
 
 const faqs = [
-  { q: "Apakah TaniAI gratis?", a: "Ya, fitur dasar gratis. Tersedia paket Premium untuk fitur lanjutan." },
-  { q: "Apakah AI memahami bahasa Indonesia?", a: "Tentu, semua AI dioptimalkan khusus untuk pertanian Indonesia." },
-  { q: "Apakah saya butuh internet stabil?", a: "Hanya saat upload foto dan chat. Data dashboard tetap dapat diakses." },
+  { q: "Apakah TaniAI Nexus gratis?", a: "Ya, fitur dasar gratis selamanya. Nanti akan ada paket Premium untuk fitur AI lanjutan dan prioritas." },
+  { q: "Apakah AI memahami bahasa Indonesia?", a: "Tentu, semua AI dioptimalkan khusus untuk pertanian Indonesia dengan dialek lokal." },
+  { q: "Apakah saya butuh internet stabil?", a: "Hanya saat upload foto dan chat. Data dashboard tetap dapat diakses offline (terbatas)." },
+  { q: "Apa saja fitur berbayar nantinya?", a: "Fitur seperti WhatsApp Bot AI (chat langsung via WA), analisis tanah mendalam, dan konsultasi premium akan menjadi bagian dari paket berbayar." },
 ];
 
 function Landing() {
@@ -73,7 +75,7 @@ function Landing() {
               Pertanian Cerdas, <span className="bg-gradient-primary bg-clip-text text-transparent">Panen Maksimal</span>
             </h1>
             <p className="mt-5 max-w-xl text-base text-muted-foreground lg:text-lg">
-              TaniAI Nexus adalah platform AI lengkap untuk petani Indonesia. Diagnosis tanaman, asisten pintar, prediksi cuaca, dan marketplace — semuanya dalam satu aplikasi.
+              TaniAI Nexus adalah platform AI lengkap untuk petani Indonesia. Diagnosis tanaman, asisten pintar, cuaca real-time, komunitas, dan edukasi — semua gratis!
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/register">
@@ -114,6 +116,11 @@ function Landing() {
               </div>
               <h3 className="mt-5 text-lg font-semibold">{f.title}</h3>
               <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
+              {f.active ? (
+                <span className="mt-3 inline-block rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Tersedia</span>
+              ) : (
+                <span className="mt-3 inline-block rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Tersedia</span>
+              )}
             </div>
           ))}
         </div>
