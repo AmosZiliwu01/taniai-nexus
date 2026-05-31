@@ -16,13 +16,11 @@ import { id as idLocale } from "date-fns/locale";
 export const Route = createFileRoute("/_authenticated/assistant")({
   head: () => ({ meta: [{ title: "AI Assistant — TaniAI Nexus" }] }),
   component: Assistant,
-  // Read optional ?q= pre-fill from plants page "Tanya AI" button
   validateSearch: (search: Record<string, unknown>) => ({
     q: typeof search.q === "string" ? search.q : undefined,
   }),
 });
 
-// ─── ID Generator (browser-safe, no crypto.randomUUID) ───────────────────────
 const generateId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2);
 
@@ -51,23 +49,25 @@ function Assistant() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Read pre-fill query from URL search params (?q=...)
   const { q: prefilledQuery } = Route.useSearch();
 
-  // ─── Hooks ────────────────────────────────────────────────────────────────
   const { data: plants = [] } = usePlants();
   const { weather, location } = useWeather();
 
-  // Latest 1 active plant (most recently added = last in array by created_at)
-  const latestActivePlant = [...plants]
-    .filter((p) => p.status === "Aktif")
-    .sort((a, b) => new Date(b.plant_date).getTime() - new Date(a.plant_date).getTime())[0] ?? null;
+  const latestActivePlant =
+    [...plants]
+      .filter((p) => p.status === "Aktif")
+      .sort(
+        (a, b) =>
+          new Date(b.plant_date).getTime() - new Date(a.plant_date).getTime()
+      )[0] ?? null;
 
-  // Latest 1 diagnosis with severity Ringan/Sedang/Berat only
   const { data: latestDiagnosis = null } = useQuery({
     queryKey: ["assistant-latest-diagnosis"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
       const { data } = await supabase
         .from("plant_diagnoses")
@@ -87,11 +87,20 @@ function Assistant() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [showConvList, setShowConvList] = useState(false);
 
-  // Auto-focus & resize input when pre-filled
+  // Keep a ref that always reflects the latest messages — used inside
+  // sendMutation to avoid stale-closure issues on the first message.
+  const messagesRef = useRef<Msg[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Guard: don't overwrite messages that were added optimistically by
+  // sendMutation with the (empty) result of a stale savedMessages query.
+  const skipNextSyncRef = useRef(false);
+
   useEffect(() => {
     if (prefilledQuery && inputRef.current) {
       inputRef.current.focus();
-      // Resize to fit the pre-filled text
       inputRef.current.style.height = "auto";
       inputRef.current.style.height =
         Math.min(inputRef.current.scrollHeight, 120) + "px";
@@ -102,7 +111,9 @@ function Assistant() {
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return [];
       const { data, error } = await supabase
         .from("ai_conversations")
@@ -139,32 +150,36 @@ function Assistant() {
     staleTime: 5_000,
   });
 
-  // Sync saved messages → local state
+  // Sync saved messages → local state, but skip if sendMutation just added
+  // optimistic messages so we don't wipe them out before the DB query
+  // returns the persisted rows.
   useEffect(() => {
-    if (savedMessages) {
-      setMessages(
-        savedMessages.map((m) => ({
-          id: m.id ?? generateId(),
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        }))
-      );
+    if (!savedMessages) return;
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
     }
+    setMessages(
+      savedMessages.map((m) => ({
+        id: m.id ?? generateId(),
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }))
+    );
   }, [savedMessages]);
 
-  // Auto scroll to bottom on new messages
+  // Auto scroll to bottom
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // ─── Build context for AI ─────────────────────────────────────────────────
+  // ─── Build context ────────────────────────────────────────────────────────
   const buildContext = useCallback(() => {
     const activePlants = plants
       .filter((p) => p.status === "Aktif")
       .map((p) => `${p.name} (${p.age_days} HST, tanah: ${p.soil_condition})`);
-
     return {
       userLocation: location?.displayName,
       weatherSummary: weather ? getWeatherSummary(weather) : undefined,
@@ -172,10 +187,12 @@ function Assistant() {
     };
   }, [plants, weather, location]);
 
-  // ─── Send message mutation ────────────────────────────────────────────────
+  // ─── Send mutation ────────────────────────────────────────────────────────
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Tidak terautentikasi. Silakan login ulang.");
 
       // Create conversation if none exists
@@ -197,20 +214,25 @@ function Assistant() {
 
       if (!chatId) throw new Error("ID percakapan tidak valid");
 
-      // Optimistic user message
+      // Add optimistic user message immediately — read from ref so we always
+      // get the latest slice, even on the very first message of a session.
       const userMsg: Msg = { id: generateId(), role: "user", content: text };
+
+      // Tell the savedMessages sync effect to skip its next run so it doesn't
+      // wipe the optimistic messages before the DB returns them.
+      skipNextSyncRef.current = true;
+
       setMessages((prev) => [...prev, userMsg]);
 
       // Persist user message
-      const { error: userMsgErr } = await supabase.from("ai_messages").insert({
-        conversation_id: chatId,
-        role: "user",
-        content: text,
-      });
-      if (userMsgErr) console.error("[ai_messages insert user]", userMsgErr);
+      const { error: userMsgErr } = await supabase
+        .from("ai_messages")
+        .insert({ conversation_id: chatId, role: "user", content: text });
+      if (userMsgErr)
+        console.error("[ai_messages insert user]", userMsgErr);
 
-      // Build conversation history for AI (last 12 messages)
-      const historyForAI = [...messages, userMsg]
+      // Build history for AI using the ref (always up-to-date)
+      const historyForAI = [...messagesRef.current, userMsg]
         .slice(-12)
         .map((m) => ({ role: m.role, content: m.content }));
 
@@ -219,28 +241,37 @@ function Assistant() {
         context: buildContext(),
       });
 
-      // Show assistant response
-      const assistantMsg: Msg = { id: generateId(), role: "assistant", content };
+      const assistantMsg: Msg = {
+        id: generateId(),
+        role: "assistant",
+        content,
+      };
+
+      // Another sync may fire after the assistant insert invalidates the
+      // query — skip it too so the optimistic assistant bubble stays visible.
+      skipNextSyncRef.current = true;
+
       setMessages((prev) => [...prev, assistantMsg]);
 
       // Persist assistant message
-      const { error: asstMsgErr } = await supabase.from("ai_messages").insert({
-        conversation_id: chatId,
-        role: "assistant",
-        content,
-      });
-      if (asstMsgErr) console.error("[ai_messages insert assistant]", asstMsgErr);
+      const { error: asstMsgErr } = await supabase
+        .from("ai_messages")
+        .insert({ conversation_id: chatId, role: "assistant", content });
+      if (asstMsgErr)
+        console.error("[ai_messages insert assistant]", asstMsgErr);
 
       return content;
     },
     onError: (e: Error) => {
       toast.error(e.message || "Gagal mengirim pesan");
-      // Remove optimistic user message on error
+      // Roll back the optimistic user message
       setMessages((prev) => {
-        const lastUser = [...prev].reverse().findIndex((m) => m.role === "user");
-        if (lastUser === -1) return prev;
-        const idx = prev.length - 1 - lastUser;
-        return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+        const idx = [...prev]
+          .reverse()
+          .findIndex((m) => m.role === "user");
+        if (idx === -1) return prev;
+        const realIdx = prev.length - 1 - idx;
+        return [...prev.slice(0, realIdx), ...prev.slice(realIdx + 1)];
       });
     },
   });
@@ -270,12 +301,14 @@ function Assistant() {
     setMessages([]);
     setInput("");
     setShowConvList(false);
+    skipNextSyncRef.current = false;
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
 
   const openConversation = useCallback(
     (id: string) => {
       if (id === activeChatId) return;
+      skipNextSyncRef.current = false;
       setActiveChatId(id);
       setMessages([]);
       setShowConvList(false);
@@ -308,6 +341,7 @@ function Assistant() {
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col lg:h-[calc(100vh-6rem)]">
       <div className="grid flex-1 overflow-hidden lg:grid-cols-[280px_1fr]">
+
         {/* ── Sidebar (desktop) ── */}
         <div className="hidden flex-col border-r border-border bg-card lg:flex">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -342,9 +376,12 @@ function Assistant() {
                       {conv.title || "Percakapan baru"}
                     </p>
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
-                      {format(new Date(conv.created_at), "d MMM yyyy", { locale: idLocale })}
+                      {format(new Date(conv.created_at), "d MMM yyyy", {
+                        locale: idLocale,
+                      })}
                     </p>
                   </button>
+                  {/* Desktop: hover-reveal delete */}
                   <button
                     onClick={(e) => deleteConversation(conv.id, e)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
@@ -359,6 +396,7 @@ function Assistant() {
 
         {/* ── Chat area ── */}
         <div className="flex flex-col overflow-hidden">
+
           {/* Mobile header */}
           <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
             <div className="flex items-center gap-2">
@@ -367,7 +405,9 @@ function Assistant() {
               </div>
               <div>
                 <p className="text-sm font-semibold">AI Assistant</p>
-                <p className="text-[10px] text-muted-foreground">Asisten pertanian Indonesia</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Asisten pertanian Indonesia
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -395,26 +435,57 @@ function Assistant() {
             </div>
           </div>
 
-          {/* Mobile conversation dropdown */}
+          {/* Mobile conversation list — always-visible delete button */}
           {showConvList && (
             <div className="border-b border-border bg-card max-h-52 overflow-y-auto lg:hidden">
               {conversations.length === 0 ? (
-                <p className="px-4 py-3 text-xs text-muted-foreground">Belum ada percakapan</p>
+                <p className="px-4 py-3 text-xs text-muted-foreground">
+                  Belum ada percakapan
+                </p>
               ) : (
                 conversations.map((conv) => (
-                  <button
+                  <div
                     key={conv.id}
-                    onClick={() => openConversation(conv.id)}
                     className={cn(
-                      "flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs transition-colors",
+                      "flex items-center gap-2 px-3 py-2.5 transition-colors",
                       activeChatId === conv.id
-                        ? "bg-primary/10 text-primary"
+                        ? "bg-primary/10"
                         : "hover:bg-muted/50"
                     )}
                   >
-                    <MessageCircle className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{conv.title || "Percakapan baru"}</span>
-                  </button>
+                    {/* Tap to open */}
+                    <button
+                      onClick={() => openConversation(conv.id)}
+                      className="flex flex-1 items-center gap-2 text-left text-xs min-w-0"
+                    >
+                      <MessageCircle
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0",
+                          activeChatId === conv.id
+                            ? "text-primary"
+                            : "text-muted-foreground"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "truncate",
+                          activeChatId === conv.id &&
+                            "text-primary font-medium"
+                        )}
+                      >
+                        {conv.title || "Percakapan baru"}
+                      </span>
+                    </button>
+
+                    {/* Always-visible delete on mobile */}
+                    <button
+                      onClick={(e) => deleteConversation(conv.id, e)}
+                      className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive transition-colors"
+                      aria-label="Hapus percakapan"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ))
               )}
             </div>
@@ -422,7 +493,7 @@ function Assistant() {
 
           {/* Messages area */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Context bar — location & weather only */}
+            {/* Context bar */}
             {(location || weather) && (
               <div className="flex flex-wrap gap-1.5 text-[10px]">
                 {location && (
@@ -451,9 +522,7 @@ function Assistant() {
                     seputar tanaman, hama, pupuk, cuaca, dan strategi panen.
                   </p>
                 </div>
-
                 <div className="grid grid-cols-1 gap-2 w-full max-w-md sm:grid-cols-2">
-                  {/* Chip 1 — latest active plant */}
                   {latestActivePlant && (
                     <button
                       onClick={() => {
@@ -463,10 +532,10 @@ function Assistant() {
                       }}
                       className="rounded-xl border border-green-200 bg-green-50 px-3 py-2.5 text-left text-xs font-medium hover:border-green-300 hover:bg-green-100 transition-colors text-green-800"
                     >
-                      🌱 Tips {latestActivePlant.name} di umur {latestActivePlant.age_days} HST?
+                      🌱 Tips {latestActivePlant.name} di umur{" "}
+                      {latestActivePlant.age_days} HST?
                     </button>
                   )}
-                  {/* Chip 2 — latest diagnosis */}
                   {latestDiagnosis && (
                     <button
                       onClick={() => {
@@ -476,11 +545,19 @@ function Assistant() {
                       }}
                       className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left text-xs font-medium hover:border-amber-300 hover:bg-amber-100 transition-colors text-amber-800"
                     >
-                      🔍 Cara atasi {latestDiagnosis.diagnosis} pada {latestDiagnosis.plant_type}?
+                      🔍 Cara atasi {latestDiagnosis.diagnosis} pada{" "}
+                      {latestDiagnosis.plant_type}?
                     </button>
                   )}
-                  {/* Generic fallback chips — fill remaining slots up to 6 */}
-                  {SUGGESTIONS.slice(0, Math.max(0, 6 - (latestActivePlant ? 1 : 0) - (latestDiagnosis ? 1 : 0))).map((s) => (
+                  {SUGGESTIONS.slice(
+                    0,
+                    Math.max(
+                      0,
+                      6 -
+                        (latestActivePlant ? 1 : 0) -
+                        (latestDiagnosis ? 1 : 0)
+                    )
+                  ).map((s) => (
                     <button
                       key={s}
                       onClick={() => {
@@ -579,7 +656,8 @@ function Assistant() {
               </Button>
             </div>
             <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-              Enter kirim · Shift+Enter baris baru · AI khusus pertanian Indonesia
+              Enter kirim · Shift+Enter baris baru · AI khusus pertanian
+              Indonesia
             </p>
           </div>
         </div>

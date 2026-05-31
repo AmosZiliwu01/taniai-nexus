@@ -1091,7 +1091,7 @@ function Community() {
   const defaultImage = presetImageUrl;
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto px-4 py-6">
+    <div className="space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">Komunitas Petani</h1>
