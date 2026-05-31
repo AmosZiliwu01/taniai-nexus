@@ -1305,7 +1305,7 @@ function ArticlesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary" /> Pusat Edukasi
+            Pusat Edukasi
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Artikel pertanian, tips AI, dan panduan praktis untuk petani

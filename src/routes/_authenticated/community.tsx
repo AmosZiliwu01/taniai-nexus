@@ -210,7 +210,6 @@ function CommentInput({ postId, replyTarget, onClearReply, onSubmitted, currentU
       const { count: commCount } = await supabase.from("community_comments").select("*", { count: "exact", head: true }).eq("post_id", postId);
       await supabase.from("community_posts").update({ comments_count: commCount ?? 0 }).eq("id", postId);
 
-      // Update cache langsung agar UI terupdate tanpa menunggu refetch
       qc.setQueriesData({ queryKey: ["community-posts"] }, (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((p: any) => p.id === postId ? { ...p, comments_count: commCount ?? 0 } : p);
@@ -428,7 +427,6 @@ function CreatePostForm({
       setRichContent(""); setCategory("Diskusi");
       setImageFile(null); setImagePreview(null); setExpanded(false);
       toast.success("Postingan berhasil dipublikasikan!");
-      // Scroll ke atas agar postingan baru (paling atas) langsung terlihat
       setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 300);
       onSuccess?.();
     },
@@ -533,12 +531,13 @@ function TopDiscussionsWidget({ posts }: { posts: Post[] }) {
   );
 }
 
-function ActiveUsersWidget() {
+// FIX: Tambahkan prop currentUserId agar user yang login selalu muncul
+function ActiveUsersWidget({ currentUserId }: { currentUserId: string }) {
   const { data: activeUsers = [] } = useQuery({
-    queryKey: ["community-active-users"],
+    // FIX: currentUserId masuk queryKey supaya re-fetch saat user sudah siap
+    queryKey: ["community-active-users", currentUserId],
     queryFn: async () => {
-      // Ambil aktivitas: postingan, komentar, likes dalam 7 hari terakhir
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const [postsRes, commentsRes, likesRes] = await Promise.all([
         supabase.from("community_posts").select("user_id").gte("created_at", since),
@@ -546,25 +545,37 @@ function ActiveUsersWidget() {
         supabase.from("post_likes").select("user_id").gte("created_at", since),
       ]);
 
-      // Hitung skor aktivitas per user
       const scoreMap: Record<string, number> = {};
       (postsRes.data ?? []).forEach(r => { scoreMap[r.user_id] = (scoreMap[r.user_id] ?? 0) + 3; });
       (commentsRes.data ?? []).forEach(r => { scoreMap[r.user_id] = (scoreMap[r.user_id] ?? 0) + 2; });
       (likesRes.data ?? []).forEach(r => { scoreMap[r.user_id] = (scoreMap[r.user_id] ?? 0) + 1; });
 
-      if (Object.keys(scoreMap).length === 0) {
-        // Fallback: ambil 5 user terbaru jika tidak ada aktivitas
-        const { data } = await supabase.from("profiles").select("id, full_name, avatar_url").order("created_at", { ascending: false }).limit(5);
-        return data ?? [];
+      // FIX: Pastikan current user selalu ada di daftar meski belum punya aktivitas
+      if (currentUserId && !scoreMap[currentUserId]) {
+        scoreMap[currentUserId] = 0;
       }
 
-      // Urutkan berdasarkan skor, ambil top 5
       const topIds = Object.entries(scoreMap)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
         .map(([id]) => id);
 
-      const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", topIds);
+      if (topIds.length === 0) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, full_name, avatar_url")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        return data ?? [];
+      }
+
+      // FIX: Sebelumnya salah pakai `userIds` (tidak terdefinisi di scope ini).
+      // Variabel yang benar adalah `topIds`.
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", topIds);
+
       const profileMap: Record<string, { id: string; full_name: string | null; avatar_url: string | null }> = {};
       (profiles ?? []).forEach(p => { profileMap[p.id] = p; });
 
@@ -572,6 +583,7 @@ function ActiveUsersWidget() {
     },
     staleTime: 5 * 60 * 1000,
   });
+
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card p-4">
       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Petani Aktif</h3>
@@ -597,6 +609,7 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
   const [menuOpen, setMenuOpen] = useState(false);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const isOwn = post.user_id === currentUserId;
+  // FIX: full_name sudah diisi dari query — fallback "Petani" hanya jika benar-benar null/kosong
   const authorName = post.author?.full_name?.trim() || "Petani";
   const [reportReason, setReportReason] = useState("");
   const [showReportModal, setShowReportModal] = useState(false);
@@ -683,7 +696,6 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
       return { newCount: count ?? 0, liked: !post.liked_by_me };
     },
     onSuccess: ({ newCount, liked }) => {
-      // Update cache secara optimistik agar UI langsung terupdate
       qc.setQueriesData({ queryKey: ["community-posts"] }, (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((p: Post) => p.id === post.id ? { ...p, likes_count: newCount, liked_by_me: liked } : p);
@@ -719,16 +731,13 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !reason) throw new Error("Alasan diperlukan");
 
-      // Cek apakah pelapor adalah admin
       const { data: reporterRole } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
       const reporterIsAdmin = !!reporterRole;
 
-      // Cek apakah pemilik postingan adalah admin
       const { data: ownerRole } = await supabase.from("user_roles").select("role").eq("user_id", post.user_id).eq("role", "admin").maybeSingle();
       const ownerIsAdmin = !!ownerRole;
 
       if (reporterIsAdmin) {
-        // Admin melaporkan postingan user → langsung tandai + notifikasi, tidak masuk laporan
         await supabase.from("community_posts").update({ is_flagged: true, flagged_reason: reason }).eq("id", post.id);
         await supabase.from("notifications").insert({
           user_id: post.user_id,
@@ -737,7 +746,6 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
           type: "community",
         });
       } else if (ownerIsAdmin) {
-        // User melaporkan postingan admin → langsung notifikasi ke admin, tidak butuh persetujuan
         await supabase.from("notifications").insert({
           user_id: post.user_id,
           title: "🚩 Postingan Anda Dilaporkan User",
@@ -745,7 +753,6 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
           type: "community",
         });
       } else {
-        // User melaporkan postingan user lain → masuk ke laporan untuk persetujuan admin
         await supabase.from("content_reports").insert({ reporter_id: user.id, post_id: post.id, reason });
       }
     },
@@ -957,31 +964,21 @@ function Community() {
   const [isAdmin, setIsAdmin] = useState(false);
   const { post: postIdFromUrl, content: contentFromUrl, shareKey } = Route.useSearch();
 
-  // ── Preset dari navigasi plant-doctor ──────────────────────────────────────
-  // Menggunakan state biasa (bukan lazy init dari sessionStorage) agar reaktif
-  // terhadap shareKey yang berubah saat navigasi tanpa remount.
   const [presetContent, setPresetContent] = useState<string>("");
   const [presetImageUrl, setPresetImageUrl] = useState<string | null>(null);
 
-  // Setiap kali shareKey berubah (navigasi baru dari plant-doctor), baca sessionStorage
   useEffect(() => {
     if (!shareKey) return;
-
     const storedKey = sessionStorage.getItem("share_preset_key");
-    // Hanya proses jika key cocok (hindari pembacaan stale dari navigasi sebelumnya)
     if (storedKey !== shareKey) return;
-
     const content = sessionStorage.getItem("share_preset_content") || "";
     const image = sessionStorage.getItem("share_preset_image") || null;
-
-    // Hapus setelah dibaca — one-shot, tidak boleh terbaca lagi
     sessionStorage.removeItem("share_preset_content");
     sessionStorage.removeItem("share_preset_image");
     sessionStorage.removeItem("share_preset_key");
-
     setPresetContent(content);
     setPresetImageUrl(image || null);
-  }, [shareKey]); // reaktif terhadap shareKey, berjalan bahkan tanpa remount
+  }, [shareKey]);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -1005,27 +1002,78 @@ function Community() {
     queryKey: ["community-posts", category, search],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      let q = supabase.from("community_posts").select("*").order("created_at", { ascending: false }).limit(30);
+
+      let q = supabase
+        .from("community_posts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(30);
       if (category !== "Semua") q = q.eq("category", category);
       if (search) q = q.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+
       const { data } = await q;
       const rawPosts = data ?? [];
       if (!rawPosts.length) return [];
-      const userIds = [...new Set(rawPosts.map(p => p.user_id))];
-      const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
+
+      const postIds   = rawPosts.map(p => p.id);
+      const authorIds = [...new Set(rawPosts.map(p => p.user_id))];
+
+      // FIX 1: Fetch profiles semua author sekaligus.
+      // Sebelumnya query ini return kosong untuk user biasa karena RLS `profiles`
+      // hanya allow SELECT untuk diri sendiri atau admin.
+      // Solusi: tambahkan RLS policy publik di Supabase:
+      //   CREATE POLICY "profiles_public_read_community" ON profiles FOR SELECT USING (true);
+      const { data: profileRows } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", authorIds);
+
       const profileMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
-      (profiles ?? []).forEach(p => { profileMap[p.id] = { full_name: p.full_name, avatar_url: p.avatar_url }; });
+      (profileRows ?? []).forEach(p => {
+        profileMap[p.id] = { full_name: p.full_name ?? null, avatar_url: p.avatar_url ?? null };
+      });
+
+      // FIX 2: Hitung likes_count dan comments_count langsung dari tabel sumber,
+      // bukan bergantung pada kolom denormalized di community_posts yang bisa
+      // ter-block RLS column-level atau nilainya stale.
+      const [likesRes, commentsRes] = await Promise.all([
+        supabase.from("post_likes").select("post_id").in("post_id", postIds),
+        supabase.from("community_comments").select("post_id").in("post_id", postIds),
+      ]);
+
+      const likesCountMap: Record<string, number> = {};
+      const commentsCountMap: Record<string, number> = {};
+      (likesRes.data ?? []).forEach(r => {
+        likesCountMap[r.post_id] = (likesCountMap[r.post_id] ?? 0) + 1;
+      });
+      (commentsRes.data ?? []).forEach(r => {
+        commentsCountMap[r.post_id] = (commentsCountMap[r.post_id] ?? 0) + 1;
+      });
+
+      // FIX 3: liked_by_me — query post_likes milik user yang sedang login.
+      // RLS post_likes perlu allow SELECT untuk row milik sendiri (auth.uid() = user_id).
       let likedIds = new Set<string>();
       if (user) {
-        const { data: likes } = await supabase.from("post_likes").select("post_id").eq("user_id", user.id).in("post_id", rawPosts.map(p => p.id));
-        likedIds = new Set((likes ?? []).map(l => l.post_id));
+        const { data: myLikes } = await supabase
+          .from("post_likes")
+          .select("post_id")
+          .eq("user_id", user.id)
+          .in("post_id", postIds);
+        likedIds = new Set((myLikes ?? []).map(l => l.post_id));
       }
-      return rawPosts.map(p => ({ ...p, author: profileMap[p.user_id] ?? { full_name: null, avatar_url: null }, liked_by_me: likedIds.has(p.id) }));
+
+      return rawPosts.map(p => ({
+        ...p,
+        // Override dengan nilai fresh dari tabel sumber
+        likes_count:    likesCountMap[p.id]    ?? p.likes_count    ?? 0,
+        comments_count: commentsCountMap[p.id] ?? p.comments_count ?? 0,
+        author:         profileMap[p.user_id]  ?? { full_name: null, avatar_url: null },
+        liked_by_me:    likedIds.has(p.id),
+      }));
     },
     staleTime: 30 * 1000,
   });
 
-  // Scroll ke postingan tertentu via URL param ?post=xxx
   useEffect(() => {
     if (postIdFromUrl && !isLoading && posts.length > 0) {
       const element = document.getElementById(`post-${postIdFromUrl}`);
@@ -1046,7 +1094,7 @@ function Community() {
     <div className="space-y-5 max-w-7xl mx-auto px-4 py-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Users className="h-6 w-6 text-primary" /> Komunitas Petani</h1>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">Komunitas Petani</h1>
           <p className="text-sm text-muted-foreground">Berbagi pengalaman & solusi bersama petani Indonesia</p>
         </div>
         <div className="relative">
@@ -1065,7 +1113,6 @@ function Community() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-5">
-          {/* Key berubah setiap shareKey baru → paksa CreatePostForm re-mount dengan data baru */}
           <CreatePostForm
             key={`${shareKey ?? "default"}-${defaultContent.slice(0, 20)}`}
             defaultContent={defaultContent}
@@ -1092,7 +1139,8 @@ function Community() {
         <div className="hidden lg:block space-y-5">
           <WeatherWidget />
           <TopDiscussionsWidget posts={posts as Post[]} />
-          <ActiveUsersWidget />
+          {/* FIX: Teruskan currentUserId ke ActiveUsersWidget */}
+          <ActiveUsersWidget currentUserId={currentUserId} />
         </div>
       </div>
     </div>

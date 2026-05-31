@@ -17,7 +17,6 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
-  History,
   Info,
   Leaf,
   Loader2,
@@ -446,6 +445,124 @@ function DiagnosisSkeleton() {
   );
 }
 
+// ─── HISTORY SECTION ─────────────────────────────────────────────────────────
+function HistorySection({
+  history,
+  histLoading,
+  deleteHistory,
+  onSelect,
+}: {
+  history: any[];
+  histLoading: boolean;
+  deleteHistory: { mutate: (id: string) => void };
+  onSelect: (d: any) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
+      {/* Header */}
+      <div className="border-b border-border px-4 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+            <Leaf className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-sm leading-none">Riwayat Diagnosa</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Auto-hapus setelah 2 bulan</p>
+          </div>
+        </div>
+        {history.length > 0 && (
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            {history.length}
+          </span>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="divide-y divide-border max-h-[480px] overflow-y-auto">
+        {histLoading ? (
+          <div className="p-4 space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-12 w-12 rounded-xl shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-36" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : history.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-10 px-4 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+              <Sprout className="h-6 w-6 text-muted-foreground/50" />
+            </div>
+            <p className="text-sm font-medium">Belum ada riwayat</p>
+            <p className="text-xs text-muted-foreground">Hasil diagnosa akan tersimpan otomatis di sini</p>
+          </div>
+        ) : (
+          history.map((d) => {
+            const severityClass =
+              d.severity === "Berat"
+                ? "bg-destructive/10 text-destructive"
+                : d.severity === "Sedang"
+                ? "bg-warning/10 text-warning"
+                : "bg-success/10 text-success";
+
+            return (
+              <div
+                key={d.id}
+                className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                onClick={() => onSelect(d)}
+              >
+                {/* Thumbnail */}
+                {d.image_url ? (
+                  <img
+                    src={d.image_url}
+                    alt=""
+                    className="h-12 w-12 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <Leaf className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold leading-tight">{d.diagnosis}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {getPlantEmoji(d.plant_type ?? "")} {d.plant_type}
+                    {" · "}
+                    {format(parseISO(d.created_at), "d MMM yyyy", { locale: idLocale })}
+                  </p>
+                </div>
+
+                {/* Severity + delete */}
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", severityClass)}>
+                    {d.severity ?? "—"}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteHistory.mutate(d.id);
+                    }}
+                    className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                    aria-label="Hapus"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 function DiagnosaTanaman() {
   const navigate = useNavigate();
@@ -468,7 +585,6 @@ function DiagnosaTanaman() {
   const [location, setLocation] = useState("");
   const [activeResult, setActiveResult] = useState<DiagnosisResult | null>(null);
   const [activeImageUrl, setActiveImageUrl] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
 
   const { data: history = [], isLoading: histLoading } = useQuery({
     queryKey: ["diagnoses"],
@@ -537,49 +653,72 @@ function DiagnosaTanaman() {
   });
 
   const handleShare = async () => {
-  if (!activeResult) return;
-  const severity = activeResult.severity;
-  if (severity !== "Ringan" && severity !== "Sedang" && severity !== "Berat") {
-    toast.info("Diagnosa ini tidak dapat dibagikan karena tingkat keparahan tidak diketahui.");
-    return;
-  }
-  const finalPlant = plantType === "Lainnya" ? customPlant : plantType;
-  const partText = plantPart || "";
-  const diagnosisText = activeResult.diagnosis || "tidak teridentifikasi";
-  const symptomsList = activeResult.symptoms?.slice(0, 3) ?? [];
+    if (!activeResult) return;
+    const severity = activeResult.severity;
+    if (severity !== "Ringan" && severity !== "Sedang" && severity !== "Berat") {
+      toast.info("Diagnosa ini tidak dapat dibagikan karena tingkat keparahan tidak diketahui.");
+      return;
+    }
+    const finalPlant = plantType === "Lainnya" ? customPlant : plantType;
+    const partText = plantPart || "";
+    const diagnosisText = activeResult.diagnosis || "tidak teridentifikasi";
+    const symptomsList = activeResult.symptoms?.slice(0, 3) ?? [];
 
-  toast.loading("AI sedang menyiapkan teks postingan...", { id: "share-ai" });
-  try {
-    const content = await generateDiagnosisShareText({
-      plantName: finalPlant,
-      diseaseName: diagnosisText,
-      severity: severity,
-      symptoms: symptomsList,
-      plantPart: partText,
-    });
-    toast.dismiss("share-ai");
-    
-    // 🔁 Buat shareKey unik
-    const shareKey = `share_${Date.now()}`;
-    
-    // Simpan data ke sessionStorage
-    sessionStorage.setItem("share_preset_content", content);
-    sessionStorage.setItem("share_preset_key", shareKey);
-    if (activeImageUrl) sessionStorage.setItem("share_preset_image", activeImageUrl);
-    else sessionStorage.removeItem("share_preset_image");
-    
-    // Navigate dengan parameter shareKey (bukan share)
-    navigate({ to: "/community", search: { shareKey } });
-  } catch (error) {
-    toast.dismiss("share-ai");
-    toast.error("Gagal menghasilkan teks, coba lagi nanti.");
-  }
-};
+    toast.loading("AI sedang menyiapkan teks postingan...", { id: "share-ai" });
+    try {
+      const content = await generateDiagnosisShareText({
+        plantName: finalPlant,
+        diseaseName: diagnosisText,
+        severity: severity,
+        symptoms: symptomsList,
+        plantPart: partText,
+      });
+      toast.dismiss("share-ai");
+      const shareKey = `share_${Date.now()}`;
+      sessionStorage.setItem("share_preset_content", content);
+      sessionStorage.setItem("share_preset_key", shareKey);
+      if (activeImageUrl) sessionStorage.setItem("share_preset_image", activeImageUrl);
+      else sessionStorage.removeItem("share_preset_image");
+      navigate({ to: "/community", search: { shareKey } });
+    } catch (error) {
+      toast.dismiss("share-ai");
+      toast.error("Gagal menghasilkan teks, coba lagi nanti.");
+    }
+  };
 
   const deleteHistory = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("plant_diagnoses").delete().eq("id", id); if (error) throw error; },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["diagnoses"] }); toast.success("Riwayat dihapus"); },
   });
+
+  const handleSelectHistory = (d: any) => {
+    const sev = d.severity as "Ringan" | "Sedang" | "Berat";
+    const symptoms = d.symptoms ? JSON.parse(d.symptoms) : undefined;
+    setActiveResult({
+      is_plant_image: d.is_plant_image ?? true,
+      diagnosis: d.diagnosis,
+      confidence: d.confidence_score ?? 0,
+      severity: sev ?? "Tidak Diketahui",
+      severity_score: d.severity_score ?? (sev === "Berat" ? 80 : sev === "Sedang" ? 50 : 25),
+      cause: d.cause ?? "",
+      cause_detail: d.cause_detail ?? undefined,
+      description: d.description ?? "",
+      symptoms,
+      initial_action: d.initial_action ?? "",
+      solution: d.solution ?? "",
+      follow_up: d.follow_up ?? "",
+      fertilizer: d.fertilizer ?? undefined,
+      pesticide: d.pesticide ?? undefined,
+      recovery_days: d.recovery_days ?? undefined,
+      detected_plant: d.detected_plant ?? undefined,
+      plant_match: d.plant_match ?? undefined,
+      plant_match_confidence: d.plant_match_confidence ?? undefined,
+      mismatch_warning: d.mismatch_warning ?? undefined,
+      confidence_note: d.confidence_note ?? undefined,
+      weather_note: d.weather_note ?? undefined,
+    });
+    setActiveImageUrl(d.image_url ?? null);
+  };
 
   const finalPlantLabel = plantType === "Lainnya" ? customPlant : plantType;
   const canDiagnose = !!preview && !!finalPlantLabel && !!plantPart;
@@ -588,56 +727,201 @@ function DiagnosaTanaman() {
     <>
       {showCamera && <CameraModal onCapture={handleCameraCapture} onClose={() => setShowCamera(false)} />}
       <div className="space-y-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div><h1 className="text-2xl font-bold tracking-tight">Diagnosa Tanaman</h1><p className="text-sm text-muted-foreground">Upload foto tanaman untuk analisa penyakit berbasis AI</p></div>
-          <Button variant="outline" size="sm" onClick={() => setShowHistory(v => !v)} className="gap-1.5 self-start sm:self-auto"><History className="h-3.5 w-3.5" /> Riwayat Diagnosa ({history.length})</Button>
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Diagnosa Tanaman</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Upload foto tanaman untuk analisa penyakit berbasis AI</p>
         </div>
+
+        {/* Main grid: form + result side by side on desktop */}
         <div className="grid gap-5 lg:grid-cols-2">
-          {/* LEFT FORM */}
+
+          {/* ── LEFT: Form ─────────────────────────────────────── */}
           <div className="space-y-4">
+            {/* Photo upload card */}
             <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
-              <div className="border-b border-border px-5 py-3.5 flex items-center gap-2.5"><div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10"><Camera className="h-4 w-4 text-primary" /></div><div><h2 className="font-semibold text-sm leading-none">1. Foto & Data Tanaman</h2><p className="text-[11px] text-muted-foreground mt-0.5">Upload foto yang jelas pada bagian tanaman yang bermasalah</p></div></div>
+              <div className="border-b border-border px-5 py-3.5 flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                  <Camera className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-sm leading-none">1. Foto & Data Tanaman</h2>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Upload foto yang jelas pada bagian tanaman yang bermasalah</p>
+                </div>
+              </div>
               <div className="p-4 space-y-3">
                 {preview ? (
-                  <div className="relative"><img src={preview} alt="Preview" className="w-full max-h-56 rounded-xl object-cover" /><button onClick={() => { setPreview(null); setFileBase64(null); }} className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"><X className="h-3.5 w-3.5" /></button><div className="absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-1 text-[10px] text-white flex items-center gap-1"><ZoomIn className="h-3 w-3" /> Gambar dipilih</div></div>
+                  <div className="relative">
+                    <img src={preview} alt="Preview" className="w-full max-h-56 rounded-xl object-cover" />
+                    <button onClick={() => { setPreview(null); setFileBase64(null); }} className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-1 text-[10px] text-white flex items-center gap-1">
+                      <ZoomIn className="h-3 w-3" /> Gambar dipilih
+                    </div>
+                  </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary/50 hover:bg-primary/5 cursor-pointer" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }} onClick={() => fileRef.current?.click()}><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10"><Upload className="h-7 w-7 text-primary" /></div><div className="text-center"><p className="font-semibold text-sm">Klik untuk upload atau seret foto</p><p className="text-xs text-muted-foreground mt-0.5">JPG, PNG · Maks 5MB · Harus foto tanaman</p></div></div>
+                  <div
+                    className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary/50 hover:bg-primary/5 cursor-pointer"
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                      <Upload className="h-7 w-7 text-primary" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold text-sm">Klik untuk upload atau seret foto</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG · Maks 5MB · Harus foto tanaman</p>
+                    </div>
+                  </div>
                 )}
-                <div className="grid grid-cols-2 gap-2"><Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}><Upload className="h-3.5 w-3.5" /> Galeri</Button><Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowCamera(true)}><Camera className="h-3.5 w-3.5" /> Kamera</Button></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}>
+                    <Upload className="h-3.5 w-3.5" /> Galeri
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowCamera(true)}>
+                    <Camera className="h-3.5 w-3.5" /> Kamera
+                  </Button>
+                </div>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
               </div>
             </div>
+
+            {/* Plant data card */}
             <div className="rounded-2xl border border-border bg-card shadow-card">
-              <div className="border-b border-border px-5 py-3.5 flex items-center gap-2.5"><div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10"><Leaf className="h-4 w-4 text-primary" /></div><h2 className="font-semibold text-sm">Data Tanaman</h2></div>
+              <div className="border-b border-border px-5 py-3.5 flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                  <Leaf className="h-4 w-4 text-primary" />
+                </div>
+                <h2 className="font-semibold text-sm">Data Tanaman</h2>
+              </div>
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs font-semibold text-foreground">Jenis Tanaman <span className="text-destructive">*</span></label><div className="mt-2"><PlantTypeSelector value={plantType} onChange={setPlantType} customPlant={customPlant} onCustomPlantChange={setCustomPlant} userPlants={userPlantNames} /></div></div>
-                  <div><label className="text-xs font-semibold text-foreground">Bagian Tanaman <span className="text-destructive">*</span></label><div className="mt-2"><PlantPartSelector value={plantPart} onChange={setPlantPart} /></div></div>
+                  <div>
+                    <label className="text-xs font-semibold text-foreground">Jenis Tanaman <span className="text-destructive">*</span></label>
+                    <div className="mt-2">
+                      <PlantTypeSelector value={plantType} onChange={setPlantType} customPlant={customPlant} onCustomPlantChange={setCustomPlant} userPlants={userPlantNames} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-foreground">Bagian Tanaman <span className="text-destructive">*</span></label>
+                    <div className="mt-2">
+                      <PlantPartSelector value={plantPart} onChange={setPlantPart} />
+                    </div>
+                  </div>
                 </div>
-                <div><label className="text-xs font-semibold text-foreground">Deskripsi Singkat Masalah</label><textarea value={problemDescription} onChange={e => setProblemDescription(e.target.value)} placeholder="Contoh: Buah cabai busuk hitam di ujung, daun menguning sejak 3 hari lalu..." rows={2} className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none resize-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50" /><p className="text-[11px] text-muted-foreground mt-1">💡 Membantu AI lebih akurat, terutama jika foto kurang jelas</p></div>
-                <div><label className="text-xs font-semibold text-foreground">Kondisi Tanah</label><div className="mt-2 grid grid-cols-3 gap-2">{SOIL_CONDITIONS.map(s => (<button key={s.value} onClick={() => setSoilCondition(s.value)} className={cn("flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-center text-xs font-medium transition-all", soilCondition === s.value ? "border-primary bg-primary/5 text-primary" : "border-border bg-muted/20 hover:border-primary/30 text-foreground")}><span className="text-lg">{s.icon}</span><span>{s.label}</span><span className="text-[9px] text-muted-foreground font-normal">{s.desc}</span></button>))}</div></div>
-                {!weather ? (<div><label className="text-xs font-semibold text-foreground">Kondisi Cuaca</label><select value={weatherCondition} onChange={e => setWeatherCondition(e.target.value)} className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary">{WEATHER_CONDITIONS.map(w => <option key={w}>{w}</option>)}</select></div>) : (<div className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-700"><span>🌤️</span><span>Cuaca real-time: {getWeatherSummary(weather)}</span></div>)}
-                <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !canDiagnose} className="w-full gap-2 py-5 bg-gradient-to-r from-primary to-primary/80" size="lg">{mutation.isPending ? (<><Loader2 className="h-4 w-4 animate-spin" /> AI sedang menganalisa...</>) : (<><Leaf className="h-4 w-4" /> Mulai Diagnosa</>)}</Button>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Deskripsi Singkat Masalah</label>
+                  <textarea
+                    value={problemDescription}
+                    onChange={e => setProblemDescription(e.target.value)}
+                    placeholder="Contoh: Buah cabai busuk hitam di ujung, daun menguning sejak 3 hari lalu..."
+                    rows={2}
+                    className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none resize-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">💡 Membantu AI lebih akurat, terutama jika foto kurang jelas</p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Kondisi Tanah</label>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {SOIL_CONDITIONS.map(s => (
+                      <button key={s.value} onClick={() => setSoilCondition(s.value)} className={cn("flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-center text-xs font-medium transition-all", soilCondition === s.value ? "border-primary bg-primary/5 text-primary" : "border-border bg-muted/20 hover:border-primary/30 text-foreground")}>
+                        <span className="text-lg">{s.icon}</span>
+                        <span>{s.label}</span>
+                        <span className="text-[9px] text-muted-foreground font-normal">{s.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {!weather ? (
+                  <div>
+                    <label className="text-xs font-semibold text-foreground">Kondisi Cuaca</label>
+                    <select value={weatherCondition} onChange={e => setWeatherCondition(e.target.value)} className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary">
+                      {WEATHER_CONDITIONS.map(w => <option key={w}>{w}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-700">
+                    <span>🌤️</span>
+                    <span>Cuaca real-time: {getWeatherSummary(weather)}</span>
+                  </div>
+                )}
+
+                <Button
+                  onClick={() => mutation.mutate()}
+                  disabled={mutation.isPending || !canDiagnose}
+                  className="w-full gap-2 py-5 bg-gradient-to-r from-primary to-primary/80"
+                  size="lg"
+                >
+                  {mutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> AI sedang menganalisa...</>
+                  ) : (
+                    <><Leaf className="h-4 w-4" /> Mulai Diagnosa</>
+                  )}
+                </Button>
+
                 {!preview && <p className="text-center text-xs text-muted-foreground -mt-2">Upload foto tanaman terlebih dahulu</p>}
                 {preview && !finalPlantLabel && <p className="text-center text-xs text-muted-foreground -mt-2">Pilih jenis tanaman terlebih dahulu</p>}
                 {preview && finalPlantLabel && !plantPart && <p className="text-center text-xs text-muted-foreground -mt-2">Pilih bagian tanaman yang difoto terlebih dahulu</p>}
-                <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-1 -mt-2"><Shield className="h-3 w-3" /> Data foto aman dan hanya digunakan untuk analisa</p>
+
+                <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-1 -mt-2">
+                  <Shield className="h-3 w-3" /> Data foto aman dan hanya digunakan untuk analisa
+                </p>
               </div>
             </div>
           </div>
-          {/* RIGHT RESULT + HISTORY */}
+
+          {/* ── RIGHT: Result + History ─────────────────────────── */}
           <div className="space-y-4">
+            {/* Diagnosis result area */}
             {mutation.isPending && <DiagnosisSkeleton />}
-            {!mutation.isPending && activeResult && (<DiagnosisCard result={activeResult} imageUrl={activeImageUrl ?? undefined} plantType={finalPlantLabel} plantPart={plantPart} onShare={handleShare} onClose={() => setActiveResult(null)} />)}
-            {!mutation.isPending && !activeResult && (<div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card/50 p-12 text-center min-h-[320px]"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10"><Sprout className="h-8 w-8 text-primary" /></div><div><p className="font-semibold">Hasil diagnosa akan muncul di sini</p><p className="mt-1 text-sm text-muted-foreground">Upload foto dan isi data tanaman, lalu klik "Mulai Diagnosa"</p></div><div className="mt-1 grid grid-cols-1 gap-2 text-left max-w-xs w-full">{[{ icon: "📷", text: "Foto jelas dengan pencahayaan cukup" }, { icon: "🔍", text: "Fokus pada bagian yang bergejala" }, { icon: "📝", text: "Isi deskripsi masalah agar AI lebih akurat" }, { icon: "🌿", text: "Pilih bagian tanaman yang difoto" }].map(tip => (<div key={tip.text} className="flex items-center gap-2 text-xs text-muted-foreground"><span>{tip.icon}</span> {tip.text}</div>))}</div></div>)}
-            {showHistory && (
-              <div className="rounded-2xl border border-border bg-card shadow-card">
-                <div className="border-b border-border px-5 py-3.5"><h2 className="font-semibold text-sm flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Riwayat Diagnosa <span className="text-xs text-muted-foreground font-normal">(auto-hapus setelah 2 bulan)</span></h2></div>
-                <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                  {histLoading ? (<div className="p-5 space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}</div>) : history.length === 0 ? (<div className="py-10 text-center text-sm text-muted-foreground">Belum ada riwayat diagnosa</div>) : (history.map(d => (<div key={d.id} className="flex items-center gap-3 px-4 py-3 group hover:bg-muted/30 cursor-pointer" onClick={() => { const sev = d.severity as "Ringan" | "Sedang" | "Berat"; const symptoms = d.symptoms ? JSON.parse(d.symptoms) : undefined; setActiveResult({ is_plant_image: d.is_plant_image ?? true, diagnosis: d.diagnosis, confidence: d.confidence_score ?? 0, severity: sev ?? "Tidak Diketahui", severity_score: d.severity_score ?? (sev === "Berat" ? 80 : sev === "Sedang" ? 50 : 25), cause: d.cause ?? "", cause_detail: d.cause_detail ?? undefined, description: d.description ?? "", symptoms: symptoms, initial_action: d.initial_action ?? "", solution: d.solution ?? "", follow_up: d.follow_up ?? "", fertilizer: d.fertilizer ?? undefined, pesticide: d.pesticide ?? undefined, recovery_days: d.recovery_days ?? undefined, detected_plant: d.detected_plant ?? undefined, plant_match: d.plant_match ?? undefined, plant_match_confidence: d.plant_match_confidence ?? undefined, mismatch_warning: d.mismatch_warning ?? undefined, confidence_note: d.confidence_note ?? undefined, weather_note: d.weather_note ?? undefined }); setActiveImageUrl(d.image_url ?? null); setShowHistory(false); }}>{d.image_url ? (<img src={d.image_url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />) : (<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10"><Leaf className="h-4 w-4 text-primary" /></div>)}<div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{d.diagnosis}</p><p className="text-xs text-muted-foreground">{d.plant_type} · {format(parseISO(d.created_at), "d MMM yyyy", { locale: idLocale })}</p></div><div className="flex items-center gap-1 shrink-0"><span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", d.severity === "Berat" ? "bg-destructive/10 text-destructive" : d.severity === "Sedang" ? "bg-warning/10 text-warning" : "bg-success/10 text-success")}>{d.severity ?? "—"}</span><button onClick={e => { e.stopPropagation(); deleteHistory.mutate(d.id); }} className="ml-1 rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="h-3.5 w-3.5" /></button></div></div>)))}
+
+            {!mutation.isPending && activeResult && (
+              <DiagnosisCard
+                result={activeResult}
+                imageUrl={activeImageUrl ?? undefined}
+                plantType={finalPlantLabel}
+                plantPart={plantPart}
+                onShare={handleShare}
+                onClose={() => setActiveResult(null)}
+              />
+            )}
+
+            {!mutation.isPending && !activeResult && (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card/50 p-10 text-center min-h-[280px]">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                  <Sprout className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold">Hasil diagnosa akan muncul di sini</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Upload foto dan isi data tanaman, lalu klik "Mulai Diagnosa"</p>
+                </div>
+                <div className="mt-1 grid grid-cols-1 gap-2 text-left max-w-xs w-full">
+                  {[
+                    { icon: "📷", text: "Foto jelas dengan pencahayaan cukup" },
+                    { icon: "🔍", text: "Fokus pada bagian yang bergejala" },
+                    { icon: "📝", text: "Isi deskripsi masalah agar AI lebih akurat" },
+                    { icon: "🌿", text: "Pilih bagian tanaman yang difoto" },
+                  ].map(tip => (
+                    <div key={tip.text} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{tip.icon}</span> {tip.text}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
+
+            {/* History — always visible */}
+            <HistorySection
+              history={history}
+              histLoading={histLoading}
+              deleteHistory={deleteHistory}
+              onSelect={handleSelectHistory}
+            />
           </div>
         </div>
       </div>
