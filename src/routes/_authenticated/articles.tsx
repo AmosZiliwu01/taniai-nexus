@@ -1266,6 +1266,21 @@ function ArticlesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Handler untuk memilih artikel terkait
+  const handleSelectRelatedArticle = (article: Article) => {
+    setViewArticle(article);
+    // Scroll ke atas ketika membuka artikel baru
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Handler untuk memilih kategori (filter)
+  const handleSelectCategory = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setViewArticle(null); // kembali ke tampilan list/grid
+    // Opsional: scroll ke atas daftar artikel
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   if (viewArticle) {
     return (
       <ArticleDetail
@@ -1279,6 +1294,8 @@ function ArticlesPage() {
           )
           .slice(0, 3)}
         categories={categories}
+        onSelectRelatedArticle={handleSelectRelatedArticle}
+        onSelectCategory={handleSelectCategory}
       />
     );
   }
@@ -1781,8 +1798,7 @@ function AdminArticleTable({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ARTICLE DETAIL PAGE
-//   Now uses ArticleDisplayCard — the exact same component as the live preview.
+// ARTICLE DETAIL PAGE — now with interactive related articles & categories
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ArticleDetail({
@@ -1790,11 +1806,15 @@ function ArticleDetail({
   onBack,
   relatedArticles,
   categories,
+  onSelectRelatedArticle,
+  onSelectCategory,
 }: {
   article: Article;
   onBack: () => void;
   relatedArticles: Article[];
   categories: Category[];
+  onSelectRelatedArticle: (article: Article) => void;
+  onSelectCategory: (categoryId: string) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -1829,7 +1849,7 @@ function ArticleDetail({
                   <div
                     key={a.id}
                     className="flex gap-3 group cursor-pointer"
-                    onClick={onBack}
+                    onClick={() => onSelectRelatedArticle(a)}
                   >
                     <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
                       {a.cover_image ? (
@@ -1873,7 +1893,7 @@ function ArticleDetail({
                   <span
                     key={c.id}
                     className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-                    onClick={onBack}
+                    onClick={() => onSelectCategory(c.id)}
                   >
                     {c.name}
                   </span>

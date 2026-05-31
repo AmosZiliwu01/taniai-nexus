@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import Swal from "sweetalert2";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Masuk — TaniAI Nexus" }] }),
@@ -24,11 +25,71 @@ function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
-    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword(parsed.data);
+
+    // 1. Login ke Supabase Auth
+    const { data: authData, error: loginError } = await supabase.auth.signInWithPassword(parsed.data);
+    if (loginError) {
+      setLoading(false);
+      toast.error(loginError.message);
+      return;
+    }
+
+    const userId = authData.user?.id;
+    if (!userId) {
+      setLoading(false);
+      toast.error("Gagal memuat data user");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    // 2. Cek apakah user diblokir
+    const { data: blockedRole } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "blocked")
+      .maybeSingle();
+
+    if (blockedRole) {
+      await supabase.auth.signOut();
+      setLoading(false);
+      await Swal.fire({
+        icon: "error",
+        title: "Akun Diblokir",
+        text: "Akun Anda telah diblokir oleh admin. Silakan hubungi administrator untuk informasi lebih lanjut.",
+        confirmButtonText: "Mengerti",
+        confirmButtonColor: "#d33",
+      });
+      return;
+    }
+
+    // 3. Cek apakah profil user masih ada (akun tidak dihapus)
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      await supabase.auth.signOut();
+      setLoading(false);
+      await Swal.fire({
+        icon: "error",
+        title: "Akun Tidak Ditemukan",
+        text: "Akun Anda sudah tidak aktif atau telah dihapus. Silakan hubungi admin atau daftar ulang.",
+        confirmButtonText: "Mengerti",
+        confirmButtonColor: "#d33",
+      });
+      return;
+    }
+
+    // 4. Login berhasil, tidak ada blokir/penghapusan
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
     toast.success("Selamat datang kembali!");
     navigate({ to: "/dashboard" });
   };

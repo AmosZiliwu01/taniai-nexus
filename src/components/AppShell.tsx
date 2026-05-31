@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotifications, getNotificationLink } from "@/hooks/useNotifications";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 
@@ -44,7 +44,6 @@ const navGroups = [
   },
 ] as const;
 
-// Mobile bottom nav — 5 tabs, no Notif (pindah ke topbar icon)
 const mobileNav = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Beranda" },
   { to: "/plant-doctor", icon: Leaf, label: "Tanaman" },
@@ -53,7 +52,7 @@ const mobileNav = [
   { to: "/profile", icon: UserIcon, label: "Akun" },
 ] as const;
 
-// ─── Sidebar nav list ────────────────────────────────────────────────────────
+// ─── NavList (sidebar) ────────────────────────────────────────────────────────
 function NavList({ pathname, onClick, isAdmin }: { pathname: string; onClick?: () => void; isAdmin?: boolean }) {
   return (
     <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -104,89 +103,6 @@ function NavList({ pathname, onClick, isAdmin }: { pathname: string; onClick?: (
         </div>
       )}
     </nav>
-  );
-}
-
-// ─── Notification Dropdown ───────────────────────────────────────────────────
-function NotificationDropdown() {
-  const [open, setOpen] = useState(false);
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
-
-  const typeIcon: Record<string, string> = {
-    warning: "🌧️", success: "✅", community: "💬", diagnosis: "🌿", weather: "⛅", info: "ℹ️",
-  };
-
-  return (
-    <div className="relative">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="relative h-9 w-9"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Bell className="h-[18px] w-[18px]" />
-        {unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </Button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-elevated">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <span className="font-semibold text-sm">Notifikasi</span>
-              <div className="flex items-center gap-1">
-                {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs"
-                    onClick={() => markAllRead.mutate()}>
-                    <CheckCheck className="h-3 w-3" /> Tandai semua
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {notifications.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">
-                  <Bell className="mx-auto mb-2 h-8 w-8 opacity-30" />
-                  Belum ada notifikasi
-                </div>
-              ) : (
-                notifications.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => { markRead.mutate(n.id); setOpen(false); }}
-                    className={cn(
-                      "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
-                      !n.is_read && "bg-primary/5"
-                    )}
-                  >
-                    <span className="mt-0.5 text-base shrink-0">
-                      {typeIcon[n.type ?? "info"] ?? "ℹ️"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className={cn("text-sm leading-snug", !n.is_read && "font-semibold")}>
-                        {n.title}
-                      </p>
-                      {n.body && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{n.body}</p>}
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: id })}
-                      </p>
-                    </div>
-                    {!n.is_read && <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
   );
 }
 
@@ -253,6 +169,160 @@ function GlobalSearch() {
   );
 }
 
+// ─── Notification Dropdown ────────────────────────────────────────────────────
+function NotificationDropdown() {
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+
+  const typeIcon: Record<string, string> = {
+    warning: "🌧️", success: "✅", community: "💬", diagnosis: "🌿", weather: "⛅", info: "ℹ️",
+  };
+
+  const handleNotificationClick = (notif: any) => {
+    const link = getNotificationLink(notif);
+    markRead.mutate(notif.id);
+    setOpen(false);
+    const postIdMatch = (notif.body || "").match(/POST_ID:([a-f0-9-]+)/);
+    const postId = postIdMatch ? postIdMatch[1] : null;
+    if ((notif.type === "community" || notif.type === "warning" || notif.type === "success") && postId) {
+      navigate({ to: "/community", search: { post: postId } } as any);
+    } else {
+      navigate({ to: link as any });
+    }
+  };
+
+  const cleanBody = (body: string | null) => {
+    if (!body) return null;
+    return body.replace(/^POST_ID:[a-f0-9-]+\n?/, "").trim();
+  };
+
+  return (
+    <div className="relative">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative h-9 w-9"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Bell className="h-[18px] w-[18px]" />
+        {unreadCount > 0 && (
+          <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </Button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-elevated">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <span className="font-semibold text-sm">Notifikasi</span>
+              <div className="flex items-center gap-1">
+                {unreadCount > 0 && (
+                  <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => markAllRead.mutate()}>
+                    <CheckCheck className="h-3 w-3" /> Tandai semua
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  <Bell className="mx-auto mb-2 h-8 w-8 opacity-30" />
+                  Belum ada notifikasi
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={cn(
+                      "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
+                      !n.is_read && "bg-primary/5"
+                    )}
+                  >
+                    <span className="mt-0.5 text-base shrink-0">
+                      {typeIcon[n.type ?? "info"] ?? "ℹ️"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className={cn("text-sm leading-snug", !n.is_read && "font-semibold")}>
+                        {n.title}
+                      </p>
+                      {n.body && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{cleanBody(n.body)}</p>}
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: id })}
+                      </p>
+                    </div>
+                    {!n.is_read && <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── UserAvatar: avatar kecil di topbar dengan fallback inisial yang benar ───
+// Menggantikan shadcn Avatar agar onError tidak menyembunyikan img secara paksa
+// dan fallback inisial selalu tampil saat foto belum/tidak bisa dimuat.
+function UserAvatarButton({
+  name,
+  email,
+  avatarUrl,
+}: {
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  // Hitung ulang saat avatarUrl berubah (login dengan akun berbeda)
+  // dengan mereset imgFailed
+  const [currentSrc, setCurrentSrc] = useState(avatarUrl);
+  if (avatarUrl !== currentSrc) {
+    setCurrentSrc(avatarUrl);
+    setImgFailed(false);
+  }
+
+  const displayName = name?.trim() || email?.split("@")[0] || "User";
+  const initials = displayName.slice(0, 2).toUpperCase();
+  const subLabel = email?.split("@")[0] ?? "";
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-muted/50 transition-colors cursor-pointer">
+      {/* Avatar dengan fallback inisial */}
+      <div className="relative h-8 w-8 shrink-0">
+        {avatarUrl && !imgFailed ? (
+          <img
+            src={avatarUrl}
+            alt={displayName}
+            className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/20"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-full ring-2 ring-primary/20 bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+            {initials}
+          </div>
+        )}
+      </div>
+      {/* Nama & email — hanya tampil di sm ke atas */}
+      <div className="hidden sm:block text-left">
+        <p className="text-xs font-semibold leading-none">{displayName}</p>
+        {subLabel && <p className="mt-0.5 text-[10px] text-muted-foreground">{subLabel}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main AppShell ────────────────────────────────────────────────────────────
 export function AppShell({
   children,
@@ -266,7 +336,6 @@ export function AppShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
-  const initials = (user.full_name || user.email || "U").slice(0, 2).toUpperCase();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -282,7 +351,6 @@ export function AppShell({
       <div className="flex flex-1 flex-col overflow-hidden">
         <NavList pathname={pathname} onClick={() => setSidebarOpen(false)} isAdmin={isAdmin} />
       </div>
-      {/* Sidebar footer */}
       <div className="shrink-0 border-t border-sidebar-border p-3">
         <Link
           to="/profile"
@@ -314,7 +382,6 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
         {/* Topbar */}
         <header className="shrink-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md lg:px-6">
-          {/* Mobile menu trigger */}
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden">
@@ -324,36 +391,26 @@ export function AppShell({
             <SheetContent side="left" className="w-72 p-0">{Sidebar}</SheetContent>
           </Sheet>
 
-          {/* Search */}
           <GlobalSearch />
 
-          {/* Right actions */}
           <div className="ml-auto flex items-center gap-1.5">
-            {/* Notification bell */}
             <NotificationDropdown />
-
-            {/* User avatar dropdown */}
-            <div className="relative group">
-              <button className="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-muted/50 transition-colors">
-                <Avatar className="h-8 w-8 ring-2 ring-primary/20">
-                  {user.avatar_url && <AvatarImage src={user.avatar_url} />}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold leading-none">{user.full_name ?? "Petani"}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">{user.email?.split("@")[0]}</p>
-                </div>
-              </button>
-            </div>
+            {/* ── Ganti komponen Avatar lama dengan UserAvatarButton ─────── */}
+            {/* Komponen baru ini menangani fallback dengan benar untuk semua
+                role user (bukan hanya admin) dan tidak menyembunyikan gambar
+                saat error tanpa memunculkan fallback inisial. */}
+            <Link to="/profile">
+              <UserAvatarButton
+                name={user.full_name ?? null}
+                email={user.email ?? null}
+                avatarUrl={user.avatar_url ?? null}
+              />
+            </Link>
           </div>
         </header>
 
-        {/* Main content */}
         <main className="flex-1 overflow-y-auto px-4 pb-24 pt-6 lg:px-8 lg:pb-10">{children}</main>
 
-        {/* Mobile bottom nav */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-lg lg:hidden">
           <div className="grid grid-cols-5">
             {mobileNav.map((n) => {

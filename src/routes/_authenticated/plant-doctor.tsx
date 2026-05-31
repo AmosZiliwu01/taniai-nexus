@@ -230,7 +230,6 @@ function PlantPartSelector({ value, onChange }: PlantPartSelectorProps) {
   );
 }
 
-// Camera Modal (sama seperti kode Anda, tidak perlu diubah)
 function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -364,7 +363,6 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
   );
 }
 
-// Severity Badge, ActionRow, DiagnosisCard (sama seperti kode Anda, tidak perlu diubah)
 function SeverityBadge({ severity, score }: { severity: string; score: number }) {
   const severityInfo = {
     Ringan: { bg: "bg-success/10", text: "text-success", border: "border-success/20", bar: "bg-success", label: "Resiko Rendah" },
@@ -538,6 +536,9 @@ function DiagnosaTanaman() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // ── Bagikan ke Komunitas ───────────────────────────────────────────────────
+  // Menggunakan shareKey unik (timestamp) sebagai trigger reaktif di community.tsx
+  // agar form langsung terbuka meski komponen Community tidak di-remount.
   const handleShare = async () => {
     if (!activeResult) return;
     const severity = activeResult.severity;
@@ -560,7 +561,17 @@ function DiagnosaTanaman() {
         plantPart: partText,
       });
       toast.dismiss("share-ai");
-      navigate({ to: "/community", state: { presetContent: content, presetImageUrl: activeImageUrl ?? undefined } });
+
+      // Buat shareKey unik berdasarkan timestamp
+      const shareKey = `share_${Date.now()}`;
+
+      // Simpan data preset ke sessionStorage
+      sessionStorage.setItem("share_preset_content", content);
+      sessionStorage.setItem("share_preset_image", activeImageUrl ?? "");
+      sessionStorage.setItem("share_preset_key", shareKey);
+
+      // Navigate ke komunitas dengan shareKey di search params sebagai trigger reaktif
+      navigate({ to: "/community", search: { shareKey } as any });
     } catch (error) {
       toast.dismiss("share-ai");
       toast.error("Gagal menghasilkan teks, coba lagi nanti.");

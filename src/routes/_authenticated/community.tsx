@@ -1,11 +1,10 @@
-// src/routes/_authenticated/community.tsx
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWeatherSummary, useWeather } from "@/hooks/useWeather";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useLocation, useSearch } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
@@ -35,6 +34,13 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/community")({
   head: () => ({ meta: [{ title: "Komunitas Petani — TaniAI Nexus" }] }),
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      post: search.post ? String(search.post) : undefined,
+      content: search.content ? String(search.content) : undefined,
+      shareKey: search.shareKey ? String(search.shareKey) : undefined,
+    };
+  },
   component: Community,
 });
 
@@ -97,7 +103,8 @@ function RichContent({ html, className, lineClamp }: { html: string; className?:
 function Avatar({ name, url, size = "sm" }: { name: string; url?: string | null; size?: "sm" | "md" }) {
   const sz = size === "md" ? "h-9 w-9 text-sm" : "h-7 w-7 text-xs";
   const initials = (name || "?").slice(0, 2).toUpperCase();
-  if (url) return <img src={url} alt={name} className={cn("rounded-full object-cover shrink-0", sz)} />;
+  const [imgFailed, setImgFailed] = useState(false);
+  if (url && !imgFailed) return <img src={url} alt={name} className={cn("rounded-full object-cover shrink-0", sz)} onError={() => setImgFailed(true)} />;
   return (
     <div className={cn("rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center font-bold text-white shrink-0", sz)}>
       {initials}
@@ -119,9 +126,8 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
-// RichEditor with id for focusing
-function RichEditor({ value, onChange, placeholder, rows = 4, editorId = "post-editor" }: {
-  value: string; onChange: (html: string) => void; placeholder: string; rows?: number; editorId?: string;
+function RichEditor({ value, onChange, placeholder, rows = 4 }: {
+  value: string; onChange: (html: string) => void; placeholder: string; rows?: number;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -146,7 +152,6 @@ function RichEditor({ value, onChange, placeholder, rows = 4, editorId = "post-e
       </div>
       <div className="relative">
         <div
-          id={editorId}
           ref={editorRef}
           contentEditable
           suppressContentEditableWarning
@@ -196,10 +201,33 @@ function CommentInput({ postId, replyTarget, onClearReply, onSubmitted, currentU
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Login dahulu");
+
       const { error } = await supabase.from("community_comments").insert({
         post_id: postId, user_id: user.id, content: finalContent, parent_id: parentId,
       });
       if (error) throw error;
+
+      const { count: commCount } = await supabase.from("community_comments").select("*", { count: "exact", head: true }).eq("post_id", postId);
+      await supabase.from("community_posts").update({ comments_count: commCount ?? 0 }).eq("id", postId);
+
+      // Update cache langsung agar UI terupdate tanpa menunggu refetch
+      qc.setQueriesData({ queryKey: ["community-posts"] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((p: any) => p.id === postId ? { ...p, comments_count: commCount ?? 0 } : p);
+      });
+
+      const { data: post } = await supabase.from("community_posts").select("user_id, title").eq("id", postId).maybeSingle();
+      if (post && post.user_id !== user.id) {
+        const { data: commenterProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+        const commenterName = commenterProfile?.full_name?.trim() || "Seseorang";
+        await supabase.from("notifications").insert({
+          user_id: post.user_id,
+          title: `💬 ${commenterName} mengomentari postingan Anda`,
+          body: `POST_ID:${postId}\n"${post.title}" — ${finalContent.slice(0, 80)}${finalContent.length > 80 ? "..." : ""}`,
+          type: "community",
+        });
+      }
+
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["post-comments", postId] }),
         qc.invalidateQueries({ queryKey: ["community-posts"] }),
@@ -250,8 +278,20 @@ function CommentItem({ comment, postId, currentUserId, onReply, depth = 0, isExp
   const name = comment.author?.full_name?.trim() || "Petani";
   const hasReplies = comment.replies.length > 0;
   const deleteComment = useMutation({
-    mutationFn: async () => { const { error } = await supabase.from("community_comments").delete().eq("id", comment.id); if (error) throw error; },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["post-comments", postId] }),
+    mutationFn: async () => {
+      const { error } = await supabase.from("community_comments").delete().eq("id", comment.id);
+      if (error) throw error;
+      const { count: commCount } = await supabase.from("community_comments").select("*", { count: "exact", head: true }).eq("post_id", postId);
+      await supabase.from("community_posts").update({ comments_count: commCount ?? 0 }).eq("id", postId);
+      return commCount ?? 0;
+    },
+    onSuccess: (commCount) => {
+      qc.setQueriesData({ queryKey: ["community-posts"] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((p: any) => p.id === postId ? { ...p, comments_count: commCount } : p);
+      });
+      qc.invalidateQueries({ queryKey: ["post-comments", postId] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const handleReplyClick = () => {
@@ -291,7 +331,6 @@ function CommentItem({ comment, postId, currentUserId, onReply, depth = 0, isExp
   );
 }
 
-// === CREATE POST FORM (with auto-expand & focus) ===
 function CreatePostForm({
   defaultContent = "",
   defaultImageUrl = null,
@@ -305,53 +344,26 @@ function CreatePostForm({
 }) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [richContent, setRichContent] = useState("");
+  const [richContent, setRichContent] = useState(() => defaultContent || "");
   const [category, setCategory] = useState("Diskusi");
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(defaultImageUrl);
-  const [expanded, setExpanded] = useState(!!defaultContent || !!defaultImageUrl);
-  const [initialized, setInitialized] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(() => defaultImageUrl || null);
+  const [expanded, setExpanded] = useState(() => !!defaultContent || !!defaultImageUrl);
   const [uploading, setUploading] = useState(false);
 
-  // Auto-expand when defaultContent or defaultImageUrl provided
   useEffect(() => {
-    if (defaultContent || defaultImageUrl) {
+    if (defaultContent && defaultContent !== richContent) {
+      setRichContent(defaultContent);
       setExpanded(true);
     }
-  }, [defaultContent, defaultImageUrl]);
+  }, [defaultContent]);
 
-  // Set initial content once
   useEffect(() => {
-    if (defaultContent && !initialized) {
-      setRichContent(defaultContent);
-      setInitialized(true);
-    }
-  }, [defaultContent, initialized]);
-
-  // Set image preview from default
-  useEffect(() => {
-    if (defaultImageUrl && !imagePreview) {
+    if (defaultImageUrl && defaultImageUrl !== imagePreview) {
       setImagePreview(defaultImageUrl);
       setExpanded(true);
     }
   }, [defaultImageUrl]);
-
-  // Focus on editor after expanded and content loaded
-  useEffect(() => {
-    if (expanded && defaultContent) {
-      const editor = document.getElementById("post-editor");
-      if (editor) {
-        editor.focus();
-        // Place cursor at the end
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(editor);
-        range.collapse(false);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-    }
-  }, [expanded, defaultContent]);
 
   const handleImageUpload = (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -381,7 +393,7 @@ function CreatePostForm({
       const finalContent = richContent.trim();
       const plain = stripHtml(richContent).trim();
       if (!plain) throw new Error("Konten tidak boleh kosong");
-      
+
       let imageUrl: string | null = null;
       if (defaultImageUrl && !imageFile) {
         imageUrl = defaultImageUrl;
@@ -412,9 +424,12 @@ function CreatePostForm({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["community-posts"] });
+      qc.invalidateQueries({ queryKey: ["community-active-users"] });
       setRichContent(""); setCategory("Diskusi");
       setImageFile(null); setImagePreview(null); setExpanded(false);
       toast.success("Postingan berhasil dipublikasikan!");
+      // Scroll ke atas agar postingan baru (paling atas) langsung terlihat
+      setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 300);
       onSuccess?.();
     },
     onError: (e: Error) => {
@@ -437,7 +452,6 @@ function CreatePostForm({
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
-      {/* Header dengan user info dan category */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
         {currentUser && <Avatar name={currentUser.name} url={currentUser.avatar_url} size="sm" />}
         <div className="flex-1">
@@ -450,63 +464,26 @@ function CreatePostForm({
         </div>
         <button onClick={() => setExpanded(false)} className="rounded-lg p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
       </div>
-
-      {/* Layout 2 kolom: Kiri untuk gambar, Kanan untuk teks */}
       <div className="flex flex-col sm:flex-row gap-4 p-4">
-        {/* Kolom Kiri - Upload Gambar */}
         <div className="sm:w-44 md:w-52 lg:w-60 shrink-0">
           {imagePreview ? (
             <div className="relative">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="w-full aspect-square object-cover rounded-xl"
-              />
-              <button
-                onClick={removeImage}
-                className="absolute -top-2 -right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <img src={imagePreview} alt="Preview" className="w-full aspect-square object-cover rounded-xl" />
+              <button onClick={removeImage} className="absolute -top-2 -right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 transition-colors"><X className="h-3.5 w-3.5" /></button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="w-full aspect-square rounded-xl border-2 border-dashed border-border bg-muted/30 hover:bg-muted/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
-            >
+            <button type="button" onClick={() => fileRef.current?.click()} className="w-full aspect-square rounded-xl border-2 border-dashed border-border bg-muted/30 hover:bg-muted/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground">
               <ImageIcon className="h-8 w-8" />
               <span className="text-xs font-medium">Upload Foto</span>
               <span className="text-[10px] text-muted-foreground/60">Max 5MB</span>
             </button>
           )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ""; }}
-          />
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ""; }} />
         </div>
-
-        {/* Kolom Kanan - Input Teks */}
         <div className="flex-1 min-w-0">
-          <RichEditor
-            value={richContent}
-            onChange={setRichContent}
-            placeholder="Apa yang ingin Anda bagikan kepada sesama petani?"
-            rows={5}
-            editorId="post-editor"
-          />
-          
-          {/* Tombol Posting */}
+          <RichEditor value={richContent} onChange={setRichContent} placeholder="Apa yang ingin Anda bagikan kepada sesama petani?" rows={5} />
           <div className="flex justify-end mt-3">
-            <Button
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !canPost}
-              size="sm"
-              className="gap-1.5 rounded-full px-5"
-            >
+            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !canPost} size="sm" className="gap-1.5 rounded-full px-5">
               {mutation.isPending || uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               Posting
             </Button>
@@ -523,9 +500,7 @@ function WeatherWidget() {
   const summary = getWeatherSummary(weather);
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card p-4">
-      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-        <span className="text-lg">🌤️</span> Cuaca Hari Ini
-      </h3>
+      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><span className="text-lg">🌤️</span> Cuaca Hari Ini</h3>
       <div className="space-y-2">
         <p className="font-medium text-sm">{location?.displayName || "Lokasi Anda"}</p>
         <p className="text-2xl font-bold">{weather.current.temp}°C</p>
@@ -540,17 +515,11 @@ function WeatherWidget() {
 }
 
 function TopDiscussionsWidget({ posts }: { posts: Post[] }) {
-  const topPosts = useMemo(() => {
-    return [...posts]
-      .sort((a, b) => b.comments_count - a.comments_count)
-      .slice(0, 5);
-  }, [posts]);
+  const topPosts = useMemo(() => [...posts].sort((a, b) => b.comments_count - a.comments_count).slice(0, 5), [posts]);
   if (topPosts.length === 0) return null;
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card p-4">
-      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-        <span className="text-lg">📈</span> Top Diskusi Hari Ini
-      </h3>
+      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><span className="text-lg">📈</span> Top Diskusi Hari Ini</h3>
       <div className="space-y-3">
         {topPosts.map((post, idx) => (
           <div key={post.id} className="flex items-center gap-3 text-sm">
@@ -568,20 +537,44 @@ function ActiveUsersWidget() {
   const { data: activeUsers = [] } = useQuery({
     queryKey: ["community-active-users"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url")
-        .order("created_at", { ascending: false })
-        .limit(5);
-      return data ?? [];
+      // Ambil aktivitas: postingan, komentar, likes dalam 7 hari terakhir
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [postsRes, commentsRes, likesRes] = await Promise.all([
+        supabase.from("community_posts").select("user_id").gte("created_at", since),
+        supabase.from("community_comments").select("user_id").gte("created_at", since),
+        supabase.from("post_likes").select("user_id").gte("created_at", since),
+      ]);
+
+      // Hitung skor aktivitas per user
+      const scoreMap: Record<string, number> = {};
+      (postsRes.data ?? []).forEach(r => { scoreMap[r.user_id] = (scoreMap[r.user_id] ?? 0) + 3; });
+      (commentsRes.data ?? []).forEach(r => { scoreMap[r.user_id] = (scoreMap[r.user_id] ?? 0) + 2; });
+      (likesRes.data ?? []).forEach(r => { scoreMap[r.user_id] = (scoreMap[r.user_id] ?? 0) + 1; });
+
+      if (Object.keys(scoreMap).length === 0) {
+        // Fallback: ambil 5 user terbaru jika tidak ada aktivitas
+        const { data } = await supabase.from("profiles").select("id, full_name, avatar_url").order("created_at", { ascending: false }).limit(5);
+        return data ?? [];
+      }
+
+      // Urutkan berdasarkan skor, ambil top 5
+      const topIds = Object.entries(scoreMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([id]) => id);
+
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", topIds);
+      const profileMap: Record<string, { id: string; full_name: string | null; avatar_url: string | null }> = {};
+      (profiles ?? []).forEach(p => { profileMap[p.id] = p; });
+
+      return topIds.map(id => profileMap[id]).filter(Boolean);
     },
     staleTime: 5 * 60 * 1000,
   });
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card p-4">
-      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-        <Users className="h-4 w-4 text-primary" /> Petani Aktif
-      </h3>
+      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Petani Aktif</h3>
       <div className="space-y-3">
         {activeUsers.map((u) => (
           <div key={u.id} className="flex items-center gap-3">
@@ -595,15 +588,7 @@ function ActiveUsersWidget() {
   );
 }
 
-function PostCard({
-  post,
-  currentUserId,
-  currentUser,
-}: {
-  post: Post;
-  currentUserId: string;
-  currentUser: { id: string; name: string; avatar_url: string | null } | null;
-}) {
+function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post: Post; currentUserId: string; currentUser: { id: string; name: string; avatar_url: string | null } | null; isAdmin?: boolean }) {
   const qc = useQueryClient();
   const [showComments, setShowComments] = useState(false);
   const [replyTarget, setReplyTarget] = useState<{ commentId: string; name: string; rootParentId: string | null } | null>(null);
@@ -615,7 +600,11 @@ function PostCard({
   const authorName = post.author?.full_name?.trim() || "Petani";
   const [reportReason, setReportReason] = useState("");
   const [showReportModal, setShowReportModal] = useState(false);
-  
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState(post.title);
+  const [editContent, setEditContent] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -633,9 +622,7 @@ function PostCard({
 
   const needsExpandButton = getLineCount(post.content) > 7;
 
-  useEffect(() => {
-    setIsTextExpanded(false);
-  }, [post.id]);
+  useEffect(() => { setIsTextExpanded(false); }, [post.id]);
 
   const { data: rawComments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ["post-comments", post.id],
@@ -668,7 +655,7 @@ function PostCard({
     return topLevel.map(top => ({
       ...top,
       root_parent_id: null,
-      replies: children.filter(c => c.parent_id === top.id || getRootParent(c) === top.id).sort((a,b) => a.created_at.localeCompare(b.created_at)).map(r => ({ ...r, root_parent_id: top.id, replies: [] })),
+      replies: children.filter(c => c.parent_id === top.id || getRootParent(c) === top.id).sort((a, b) => a.created_at.localeCompare(b.created_at)).map(r => ({ ...r, root_parent_id: top.id, replies: [] })),
     }));
   }, [rawComments, commentAuthors]);
 
@@ -676,21 +663,91 @@ function PostCard({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Login dahulu");
-      if (post.liked_by_me) await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
-      else await supabase.from("post_likes").insert({ post_id: post.id, user_id: user.id });
+      if (post.liked_by_me) {
+        await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
+      } else {
+        await supabase.from("post_likes").insert({ post_id: post.id, user_id: user.id });
+        if (post.user_id !== user.id) {
+          const { data: likerProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+          const likerName = likerProfile?.full_name?.trim() || "Seseorang";
+          await supabase.from("notifications").insert({
+            user_id: post.user_id,
+            title: `❤️ ${likerName} menyukai postingan Anda`,
+            body: `POST_ID:${post.id}\n"${post.title}"`,
+            type: "community",
+          });
+        }
+      }
+      const { count } = await supabase.from("post_likes").select("*", { count: "exact", head: true }).eq("post_id", post.id);
+      await supabase.from("community_posts").update({ likes_count: count ?? 0 }).eq("id", post.id);
+      return { newCount: count ?? 0, liked: !post.liked_by_me };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["community-posts"] }),
+    onSuccess: ({ newCount, liked }) => {
+      // Update cache secara optimistik agar UI langsung terupdate
+      qc.setQueriesData({ queryKey: ["community-posts"] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((p: Post) => p.id === post.id ? { ...p, likes_count: newCount, liked_by_me: liked } : p);
+      });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const deletePost = useMutation({
     mutationFn: async () => { const { error } = await supabase.from("community_posts").delete().eq("id", post.id); if (error) throw error; },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["community-posts"] }); toast.success("Postingan dihapus"); },
   });
+
+  const handleEditSave = async () => {
+    if (!editTitle.trim() || !editContent.trim()) { toast.error("Judul dan konten tidak boleh kosong"); return; }
+    setEditSaving(true);
+    try {
+      const { error } = await supabase.from("community_posts").update({
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        is_flagged: false,
+        flagged_reason: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", post.id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["community-posts"] });
+      setShowEditModal(false);
+      toast.success("Postingan diperbarui!" + (post.is_flagged ? " Tanda peringatan otomatis dihapus." : ""));
+    } catch (e: any) { toast.error(e.message); } finally { setEditSaving(false); }
+  };
+
   const reportPost = useMutation({
     mutationFn: async (reason: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !reason) throw new Error("Alasan diperlukan");
-      await supabase.from("content_reports").insert({ reporter_id: user.id, post_id: post.id, reason });
+
+      // Cek apakah pelapor adalah admin
+      const { data: reporterRole } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+      const reporterIsAdmin = !!reporterRole;
+
+      // Cek apakah pemilik postingan adalah admin
+      const { data: ownerRole } = await supabase.from("user_roles").select("role").eq("user_id", post.user_id).eq("role", "admin").maybeSingle();
+      const ownerIsAdmin = !!ownerRole;
+
+      if (reporterIsAdmin) {
+        // Admin melaporkan postingan user → langsung tandai + notifikasi, tidak masuk laporan
+        await supabase.from("community_posts").update({ is_flagged: true, flagged_reason: reason }).eq("id", post.id);
+        await supabase.from("notifications").insert({
+          user_id: post.user_id,
+          title: "🚨 Postingan Anda Dilaporkan",
+          body: `POST_ID:${post.id}\nPostingan \"${post.title}\" dilaporkan oleh admin karena: ${reason}. Harap perbarui konten Anda agar tanda dihapus.`,
+          type: "community",
+        });
+      } else if (ownerIsAdmin) {
+        // User melaporkan postingan admin → langsung notifikasi ke admin, tidak butuh persetujuan
+        await supabase.from("notifications").insert({
+          user_id: post.user_id,
+          title: "🚩 Postingan Anda Dilaporkan User",
+          body: `POST_ID:${post.id}\nPostingan \"${post.title}\" dilaporkan oleh pengguna dengan alasan: ${reason}.`,
+          type: "community",
+        });
+      } else {
+        // User melaporkan postingan user lain → masuk ke laporan untuk persetujuan admin
+        await supabase.from("content_reports").insert({ reporter_id: user.id, post_id: post.id, reason });
+      }
     },
     onSuccess: () => { setShowReportModal(false); toast.success("Laporan terkirim"); },
     onError: (e: Error) => toast.error(e.message),
@@ -700,9 +757,7 @@ function PostCard({
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/community?post=${post.id}`);
       toast.success("Link postingan disalin!");
-    } catch (err) {
-      toast.error("Gagal menyalin link");
-    }
+    } catch (err) { toast.error("Gagal menyalin link"); }
   };
 
   const handleReply = useCallback((target: { commentId: string; name: string; rootParentId: string | null }) => {
@@ -720,9 +775,8 @@ function PostCard({
 
   return (
     <>
-      <div className="rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all overflow-hidden">
+      <div id={`post-${post.id}`} className="rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all overflow-hidden">
         <div className="p-4">
-          {/* Header */}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <Avatar name={authorName} url={post.author?.avatar_url} size="md" />
@@ -737,103 +791,50 @@ function PostCard({
                 </p>
               </div>
             </div>
-            
-            {/* Three dots menu */}
-            {isOwn && (
+            {isOwn ? (
               <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="rounded-full p-1.5 hover:bg-muted transition-colors"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
+                <button onClick={() => setMenuOpen(!menuOpen)} className="rounded-full p-1.5 hover:bg-muted"><MoreHorizontal className="h-4 w-4" /></button>
                 {menuOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                    <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-xl border border-border bg-card shadow-elevated py-1 overflow-hidden">
-                      <button
-                        onClick={() => { setMenuOpen(false); }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
-                      >
-                        <Edit className="h-3.5 w-3.5" /> Update postingan
-                      </button>
-                      <button
-                        onClick={() => { if (confirm("Hapus postingan ini?")) deletePost.mutate(); setMenuOpen(false); }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Hapus postingan
-                      </button>
+                    <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-xl border border-border bg-card shadow-elevated py-1">
+                      <button onClick={() => { setMenuOpen(false); setEditTitle(post.title); setEditContent(post.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"><Edit className="h-3.5 w-3.5" /> Update postingan</button>
+                      <button onClick={() => { if (confirm("Hapus postingan ini?")) deletePost.mutate(); setMenuOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Hapus postingan</button>
                     </div>
                   </>
                 )}
               </div>
-            )}
-
-            {!isOwn && (
-              <button
-                onClick={() => setShowReportModal(true)}
-                className="rounded-full p-1.5 text-muted-foreground hover:bg-muted transition-colors"
-                title="Laporkan"
-              >
-                <Flag className="h-4 w-4" />
-              </button>
+            ) : (
+              <button onClick={() => setShowReportModal(true)} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><Flag className="h-4 w-4" /></button>
             )}
           </div>
 
-          {/* Area konten + gambar secara horizontal */}
           <div className="mt-3 flex gap-4">
-            {/* Gambar - di samping kiri */}
             {post.image_url && (
-              <div 
-                className="shrink-0 w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 xl:w-72 xl:h-72 cursor-pointer"
-                onClick={() => isMobile && setModalOpen(true)}
-              >
-                <img
-                  src={post.image_url}
-                  alt=""
-                  className="w-full h-full object-cover hover:opacity-90 transition-opacity rounded-xl border border-border/100"
-                />
+              <div className="shrink-0 w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 xl:w-72 xl:h-72 cursor-pointer" onClick={() => isMobile && setModalOpen(true)}>
+                <img src={post.image_url} alt="" className="w-full h-full object-cover hover:opacity-90 rounded-xl border border-border/100" />
               </div>
             )}
-
-            {/* Konten teks */}
             <div className="flex-1 min-w-0">
               {!isMobile ? (
                 <>
-                  <RichContent 
-                    html={post.content} 
-                    className="text-foreground/85" 
-                    lineClamp={isTextExpanded ? undefined : (needsExpandButton ? 12 : undefined)}
-                  />
+                  <RichContent html={post.content} className="text-foreground/85" lineClamp={isTextExpanded ? undefined : (needsExpandButton ? 12 : undefined)} />
                   {needsExpandButton && (
-                    <button
-                      onClick={() => setIsTextExpanded(!isTextExpanded)}
-                      className="mt-1 text-xs text-primary/70 hover:text-primary transition-colors font-medium"
-                    >
+                    <button onClick={() => setIsTextExpanded(!isTextExpanded)} className="mt-1 text-xs text-primary/70 hover:text-primary font-medium">
                       {isTextExpanded ? "Sembunyikan" : "Lihat selengkapnya"}
                     </button>
                   )}
                 </>
               ) : (
                 <>
-                  <RichContent 
-                    html={post.content} 
-                    className="text-foreground/85" 
-                    lineClamp={3}
-                  />
-                  <button
-                    onClick={() => setModalOpen(true)}
-                    className="mt-1 text-xs text-primary/70 hover:text-primary transition-colors font-medium"
-                  >
-                    Lihat selengkapnya
-                  </button>
+                  <RichContent html={post.content} className="text-foreground/85" lineClamp={3} />
+                  <button onClick={() => setModalOpen(true)} className="mt-1 text-xs text-primary/70 hover:text-primary font-medium">Lihat selengkapnya</button>
                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="flex items-center border-t border-border/60 px-3 py-1.5">
           <button onClick={() => likeMutation.mutate()} className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-colors", post.liked_by_me ? "text-red-500 bg-red-50" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
             <Heart className={cn("h-4 w-4", post.liked_by_me && "fill-red-500")} />
@@ -847,12 +848,11 @@ function PostCard({
             <span>Komentar</span>
           </button>
           <div className="w-px h-5 bg-border/40" />
-          <button onClick={handleShare} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors">
+          <button onClick={handleShare} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
             <Share2 className="h-4 w-4" /> <span>Bagikan</span>
           </button>
         </div>
 
-        {/* Comments section */}
         {showComments && (
           <div className="border-t border-border/60 px-4 pt-3 pb-4 space-y-3 bg-muted/10">
             {commentsLoading ? (
@@ -865,23 +865,12 @@ function PostCard({
               </div>
             )}
             <div id={`comment-input-${post.id}`}>
-              <CommentInput
-                postId={post.id}
-                replyTarget={replyTarget}
-                onClearReply={() => setReplyTarget(null)}
-                onSubmitted={() => {
-                  if (replyTarget) handleReplySuccess(replyTarget.commentId);
-                  else qc.invalidateQueries({ queryKey: ["post-comments", post.id] });
-                  setReplyTarget(null);
-                }}
-                currentUser={currentUser}
-              />
+              <CommentInput postId={post.id} replyTarget={replyTarget} onClearReply={() => setReplyTarget(null)} onSubmitted={() => { if (replyTarget) handleReplySuccess(replyTarget.commentId); else qc.invalidateQueries({ queryKey: ["post-comments", post.id] }); setReplyTarget(null); }} currentUser={currentUser} />
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal detail - ONLY FOR MOBILE */}
       {isMobile && modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}>
           <div className="relative w-full max-w-2xl max-h-[85vh] overflow-auto rounded-2xl border border-border bg-card shadow-elevated thin-scroll">
@@ -889,32 +878,20 @@ function PostCard({
               <div className="flex items-center gap-3">
                 <Avatar name={authorName} url={post.author?.avatar_url} size="md" />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{authorName}</span>
-                    <CategoryBadge category={post.category} />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {formatDistanceToNow(parseISO(post.created_at), { addSuffix: true, locale: idLocale })}
-                  </p>
+                  <div className="flex items-center gap-2"><span className="font-semibold text-sm">{authorName}</span><CategoryBadge category={post.category} /></div>
+                  <p className="text-[11px] text-muted-foreground">{formatDistanceToNow(parseISO(post.created_at), { addSuffix: true, locale: idLocale })}</p>
                 </div>
               </div>
-              <button onClick={() => setModalOpen(false)} className="rounded-full p-1.5 hover:bg-muted">
-                <X className="h-5 w-5" />
-              </button>
+              <button onClick={() => setModalOpen(false)} className="rounded-full p-1.5 hover:bg-muted"><X className="h-5 w-5" /></button>
             </div>
             <div className="p-5 space-y-4">
               <RichContent html={post.content} className="text-foreground" />
-              {post.image_url && (
-                <div className="overflow-hidden">
-                  <img src={post.image_url} alt="" className="w-full object-cover max-h-[480px]" />
-                </div>
-              )}
+              {post.image_url && <img src={post.image_url} alt="" className="w-full object-cover max-h-[480px]" />}
             </div>
           </div>
         </div>
       )}
 
-      {/* Report Modal */}
       {showReportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowReportModal(false); }}>
           <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl p-5">
@@ -923,11 +900,7 @@ function PostCard({
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium">Alasan</label>
-                <select
-                  value={reportReason}
-                  onChange={(e) => setReportReason(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-                >
+                <select value={reportReason} onChange={(e) => setReportReason(e.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary">
                   <option value="">Pilih alasan...</option>
                   <option value="Spam">Spam / Iklan</option>
                   <option value="Informasi palsu">Informasi palsu / Hoaks</option>
@@ -945,11 +918,33 @@ function PostCard({
           </div>
         </div>
       )}
-      <style>{`
-        .thin-scroll::-webkit-scrollbar { width: 4px; }
-        .thin-scroll::-webkit-scrollbar-track { background: transparent; }
-        .thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 20px; }
-      `}</style>
+
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowEditModal(false); }}>
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Update Postingan</h3>
+              {post.is_flagged && <span className="text-xs rounded-full bg-warning/20 text-warning px-2 py-0.5 border border-warning/30">⚠️ Postingan ditandai — simpan untuk hapus tanda</span>}
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Judul</label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Judul postingan..." />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Konten</label>
+              <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={5} className="mt-1.5 w-full resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Isi postingan..." />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Batal</Button>
+              <Button className="flex-1" onClick={handleEditSave} disabled={editSaving || !editTitle.trim() || !editContent.trim()}>
+                {editSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Menyimpan...</> : "Simpan Perubahan"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`.thin-scroll::-webkit-scrollbar { width: 4px; } .thin-scroll::-webkit-scrollbar-track { background: transparent; } .thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 20px; }`}</style>
     </>
   );
 }
@@ -959,23 +954,50 @@ function Community() {
   const [search, setSearch] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; avatar_url: string | null } | null>(null);
-  const searchParams = useSearch({ from: "/_authenticated/community" as any });
-  const location = useLocation();
-  const state = location.state as any;
-  const presetContent = state?.presetContent || "";
-  const presetImageUrl = state?.presetImageUrl || null;
-  const defaultContent = (searchParams as any)?.content ?? presetContent;
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { post: postIdFromUrl, content: contentFromUrl, shareKey } = Route.useSearch();
+
+  // ── Preset dari navigasi plant-doctor ──────────────────────────────────────
+  // Menggunakan state biasa (bukan lazy init dari sessionStorage) agar reaktif
+  // terhadap shareKey yang berubah saat navigasi tanpa remount.
+  const [presetContent, setPresetContent] = useState<string>("");
+  const [presetImageUrl, setPresetImageUrl] = useState<string | null>(null);
+
+  // Setiap kali shareKey berubah (navigasi baru dari plant-doctor), baca sessionStorage
+  useEffect(() => {
+    if (!shareKey) return;
+
+    const storedKey = sessionStorage.getItem("share_preset_key");
+    // Hanya proses jika key cocok (hindari pembacaan stale dari navigasi sebelumnya)
+    if (storedKey !== shareKey) return;
+
+    const content = sessionStorage.getItem("share_preset_content") || "";
+    const image = sessionStorage.getItem("share_preset_image") || null;
+
+    // Hapus setelah dibaca — one-shot, tidak boleh terbaca lagi
+    sessionStorage.removeItem("share_preset_content");
+    sessionStorage.removeItem("share_preset_image");
+    sessionStorage.removeItem("share_preset_key");
+
+    setPresetContent(content);
+    setPresetImageUrl(image || null);
+  }, [shareKey]); // reaktif terhadap shareKey, berjalan bahkan tanpa remount
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
       setCurrentUserId(user.id);
-      const { data } = await supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).maybeSingle();
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
+      ]);
+      const data = profileRes.data;
       setCurrentUser({
         id: user.id,
         name: data?.full_name?.trim() || user.email?.split("@")[0] || "Anda",
         avatar_url: data?.avatar_url ?? null,
       });
+      setIsAdmin(!!roleRes.data);
     });
   }, []);
 
@@ -1003,33 +1025,39 @@ function Community() {
     staleTime: 30 * 1000,
   });
 
+  // Scroll ke postingan tertentu via URL param ?post=xxx
+  useEffect(() => {
+    if (postIdFromUrl && !isLoading && posts.length > 0) {
+      const element = document.getElementById(`post-${postIdFromUrl}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+        element.classList.add("ring-2", "ring-primary", "ring-offset-2", "rounded-2xl", "transition-all");
+        setTimeout(() => {
+          element.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+        }, 2000);
+      }
+    }
+  }, [postIdFromUrl, isLoading, posts]);
+
+  const defaultContent = contentFromUrl || presetContent;
+  const defaultImage = presetImageUrl;
+
   return (
     <div className="space-y-5 max-w-7xl mx-auto px-4 py-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" /> Komunitas Petani
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Users className="h-6 w-6 text-primary" /> Komunitas Petani</h1>
           <p className="text-sm text-muted-foreground">Berbagi pengalaman & solusi bersama petani Indonesia</p>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari diskusi..."
-            className="h-10 w-full rounded-xl border border-input bg-card pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all sm:w-64"
-          />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari diskusi..." className="h-10 w-full rounded-xl border border-input bg-card pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all sm:w-64" />
         </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
         {CATEGORIES.map(c => (
-          <button
-            key={c}
-            onClick={() => setCategory(c)}
-            className={cn("shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all", category === c ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground")}
-          >
+          <button key={c} onClick={() => setCategory(c)} className={cn("shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all", category === c ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground")}>
             {c}
           </button>
         ))}
@@ -1037,7 +1065,13 @@ function Community() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-5">
-          <CreatePostForm defaultContent={defaultContent} defaultImageUrl={presetImageUrl} currentUser={currentUser} />
+          {/* Key berubah setiap shareKey baru → paksa CreatePostForm re-mount dengan data baru */}
+          <CreatePostForm
+            key={`${shareKey ?? "default"}-${defaultContent.slice(0, 20)}`}
+            defaultContent={defaultContent}
+            defaultImageUrl={defaultImage}
+            currentUser={currentUser}
+          />
           {isLoading ? (
             <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}</div>
           ) : posts.length === 0 ? (
@@ -1050,12 +1084,11 @@ function Community() {
             <>
               <p className="text-xs text-muted-foreground px-1">{posts.length} diskusi ditemukan</p>
               <div className="space-y-5">
-                {posts.map(post => <PostCard key={post.id} post={post as Post} currentUserId={currentUserId} currentUser={currentUser} />)}
+                {posts.map(post => <PostCard key={post.id} post={post as Post} currentUserId={currentUserId} currentUser={currentUser} isAdmin={isAdmin} />)}
               </div>
             </>
           )}
         </div>
-
         <div className="hidden lg:block space-y-5">
           <WeatherWidget />
           <TopDiscussionsWidget posts={posts as Post[]} />

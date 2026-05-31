@@ -870,62 +870,6 @@ function WeatherPage() {
                 ))}
               </div>
             )}
-
-            {/* AI WARNING */}
-            {plants.length > 0 &&
-              diseaseWarnings?.warnings &&
-              diseaseWarnings.warnings.length > 0 && (
-                <div className="rounded-2xl border bg-card shadow-sm">
-                  <div className="flex items-center gap-2 border-b px-5 py-4">
-                    <Leaf className="h-4 w-4 text-primary" />
-                    <h2 className="font-semibold">Peringatan Dini Penyakit</h2>
-                  </div>
-                  <div className="divide-y">
-                    {diseaseWarnings.warnings.map((w: any, i: number) => (
-                      <div key={i} className="flex gap-3 px-5 py-4">
-                        <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-red-500/10 text-xs font-bold text-red-500">
-                          !
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold">
-                            {w.plant} — {w.risk}
-                          </p>
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            {w.message}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            {/* FARMING TIPS */}
-            <div className="rounded-2xl border bg-card shadow-sm">
-              <div className="flex items-center gap-2 border-b px-5 py-4">
-                <Leaf className="h-4 w-4 text-primary" />
-                <h2 className="font-semibold">Rekomendasi Pertanian Hari Ini</h2>
-              </div>
-              <div className="grid gap-3 p-5 sm:grid-cols-2">
-                {getFarmingTips(
-                  weather.current.condition,
-                  weather.current.humidity
-                ).map((tip, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-2.5 rounded-xl border bg-muted/30 p-3"
-                  >
-                    <span className="text-base">{tip.emoji}</span>
-                    <div>
-                      <p className="text-sm font-semibold">{tip.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {tip.desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 
@@ -946,51 +890,4 @@ function WeatherPage() {
       </div>
     </>
   );
-}
-
-// ─────────────────────────────────────────────────────────────
-// FARMING TIPS
-// ─────────────────────────────────────────────────────────────
-
-function getFarmingTips(condition: string, humidity: number) {
-  const c = condition.toLowerCase();
-
-  const isRainy =
-    c.includes("hujan") || c.includes("badai") || c.includes("drizzle");
-  const isHot = !isRainy && humidity < 60;
-  const isMuggy = humidity >= 80;
-
-  if (isRainy) {
-    return [
-      { emoji: "🚿", title: "Tunda Penyiraman", desc: "Tidak perlu menyiram saat hujan." },
-      { emoji: "🌊", title: "Periksa Drainase", desc: "Pastikan saluran air lancar." },
-      { emoji: "🍄", title: "Waspadai Jamur", desc: "Kelembapan tinggi picu jamur." },
-      { emoji: "🌱", title: "Tunda Pemupukan", desc: "Hindari pupuk daun saat hujan." },
-    ];
-  }
-
-  if (isMuggy) {
-    return [
-      { emoji: "💨", title: "Sirkulasi Udara", desc: "Pangkas tanaman terlalu rapat." },
-      { emoji: "🌿", title: "Periksa Hama", desc: "Waspadai kutu dan tungau." },
-      { emoji: "🔬", title: "Pantau Penyakit", desc: "Periksa daun setiap pagi." },
-      { emoji: "💧", title: "Kurangi Penyiraman", desc: "Tanah mungkin masih lembap." },
-    ];
-  }
-
-  if (isHot) {
-    return [
-      { emoji: "💧", title: "Siram Pagi/Sore", desc: "Waktu terbaik penyiraman." },
-      { emoji: "🌾", title: "Mulsa Tanah", desc: "Jaga kelembapan tanah." },
-      { emoji: "🕶️", title: "Naungan Bibit", desc: "Lindungi bibit muda." },
-      { emoji: "🧪", title: "Pupuk Cair", desc: "Pupuk daun pagi hari." },
-    ];
-  }
-
-  return [
-    { emoji: "✅", title: "Cuaca Ideal", desc: "Kondisi mendukung aktivitas tani." },
-    { emoji: "🌱", title: "Penanaman", desc: "Hari baik untuk tanam bibit." },
-    { emoji: "🧪", title: "Pemupukan", desc: "Waktu tepat untuk pemupukan." },
-    { emoji: "🔍", title: "Monitoring", desc: "Lakukan pengecekan rutin." },
-  ];
 }
