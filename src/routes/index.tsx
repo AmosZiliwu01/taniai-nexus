@@ -154,55 +154,36 @@ function Landing() {
 
       {/* Features */}
       <section id="fitur" className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
-  <div className="mx-auto max-w-2xl text-center">
-    <h2 className="text-3xl font-bold tracking-tight lg:text-4xl">Fitur Unggulan</h2>
-    <p className="mt-3 text-muted-foreground">Semua yang petani modern butuhkan dalam satu platform.</p>
-  </div>
-  <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-    {features.map((f) => (
-      <div key={f.title} className="group rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-1 hover:shadow-elevated">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-primary shadow-soft">
-          <f.icon className="h-6 w-6 text-primary-foreground" />
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight lg:text-4xl">Fitur Unggulan</h2>
+          <p className="mt-3 text-muted-foreground">Semua yang petani modern butuhkan dalam satu platform.</p>
         </div>
-        <h3 className="mt-5 text-lg font-semibold">{f.title}</h3>
-        <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
-        {f.active ? (
-          <span className="mt-3 inline-block rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Tersedia</span>
-        ) : (
-          <span className="mt-3 inline-block rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">Segera</span>
-        )}
-      </div>
-    ))}
-  </div>
-</section>
-
-{/* Steps */}
-<section id="cara" className="bg-gradient-soft py-12">
-  <div className="mx-auto max-w-7xl px-4 lg:px-8">
-    <div className="mx-auto max-w-2xl text-center">
-      <h2 className="text-3xl font-bold tracking-tight lg:text-4xl">Cara Kerja</h2>
-      <p className="mt-3 text-muted-foreground">Tiga langkah sederhana untuk pertanian cerdas.</p>
-    </div>
-    <div className="mt-10 grid gap-5 md:grid-cols-3">
-      {steps.map((s) => (
-        <div key={s.n} className="rounded-2xl border border-border bg-card p-6 shadow-card">
-          <span className="text-3xl font-bold text-primary/30">{s.n}</span>
-          <h3 className="mt-3 text-lg font-semibold">{s.t}</h3>
-          <p className="mt-1.5 text-sm text-muted-foreground">{s.d}</p>
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <div key={f.title} className="group rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-1 hover:shadow-elevated">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-primary shadow-soft">
+                <f.icon className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <h3 className="mt-5 text-lg font-semibold">{f.title}</h3>
+              <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
+              {f.active ? (
+                <span className="mt-3 inline-block rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Tersedia</span>
+              ) : (
+                <span className="mt-3 inline-block rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">Segera</span>
+              )}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
-  </div>
-</section>
+      </section>
 
       {/* Steps */}
-      <section id="cara" className="bg-gradient-soft py-20">
+      <section id="cara" className="bg-gradient-soft py-12">
         <div className="mx-auto max-w-7xl px-4 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight lg:text-4xl">Cara Kerja</h2>
             <p className="mt-3 text-muted-foreground">Tiga langkah sederhana untuk pertanian cerdas.</p>
           </div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
             {steps.map((s) => (
               <div key={s.n} className="rounded-2xl border border-border bg-card p-6 shadow-card">
                 <span className="text-3xl font-bold text-primary/30">{s.n}</span>
