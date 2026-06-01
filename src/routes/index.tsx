@@ -2,7 +2,9 @@ import heroImg from "@/assets/hero-ai-farming.jpg";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, BarChart3, BookOpen, Check, CloudSun, Leaf, MessageCircle, Sparkles, Star, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, BookOpen, Check, CloudSun, Leaf, MessageCircle, MessageSquare, Sparkles, Star, Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -45,7 +47,7 @@ const features = [
   { icon: CloudSun, title: "Cuaca & Peringatan", desc: "Info cuaca real-time dan peringatan dini risiko penyakit tanaman.", active: true },
   { icon: Users, title: "Komunitas Petani", desc: "Berbagi pengalaman dan solusi dengan sesama petani Indonesia.", active: true },
   { icon: BookOpen, title: "Pusat Edukasi", desc: "Artikel pertanian, panduan, dan tips dari pakar.", active: true },
-  { icon: BarChart3, title: "Analytics", desc: "Statistik hasil panen dan tren penyakit.", active: false },
+  { icon: MessageSquare, title: "WhatsApp Bot AI", desc: "Chat langsung dengan AI TaniAI via WhatsApp kapan saja, tanpa buka aplikasi.", active: true },
 ];
 
 const steps = [
@@ -64,10 +66,30 @@ const faqs = [
   { q: "Apakah TaniAI Nexus gratis?", a: "Ya, fitur dasar gratis selamanya. Nanti akan ada paket Premium untuk fitur AI lanjutan dan prioritas." },
   { q: "Apakah AI memahami bahasa Indonesia?", a: "Tentu, semua AI dioptimalkan khusus untuk pertanian Indonesia dengan dialek lokal." },
   { q: "Apakah saya butuh internet stabil?", a: "Hanya saat upload foto dan chat. Data dashboard tetap dapat diakses offline (terbatas)." },
-  { q: "Apa saja fitur berbayar nantinya?", a: "Fitur seperti WhatsApp Bot AI (chat langsung via WA), analisis tanah mendalam, dan konsultasi premium akan menjadi bagian dari paket berbayar." },
+  { q: "Bagaimana cara pakai WhatsApp Bot AI?", a: "Setelah daftar, hubungkan akun TaniAI kamu ke WhatsApp via menu Pengaturan. Bot AI siap menjawab pertanyaan dan diagnosa tanaman langsung di WA." },
 ];
 
 function Landing() {
+  const { data: stats } = useQuery({
+    queryKey: ["landing-stats"],
+    queryFn: async () => {
+      const [usersRes, diagnosesRes] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("plant_diagnoses").select("*", { count: "exact", head: true }),
+      ]);
+      return {
+        users: usersRes.count ?? 0,
+        diagnoses: diagnosesRes.count ?? 0,
+      };
+    },
+    staleTime: 10 * 60 * 1000, // cache 10 menit
+  });
+
+  const formatCount = (n: number) => {
+    if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K+`;
+    return n > 0 ? `${n}+` : "—";
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -110,7 +132,11 @@ function Landing() {
               <a href="#fitur"><Button size="lg" variant="outline">Lihat Fitur</Button></a>
             </div>
             <div className="mt-10 flex flex-wrap gap-8">
-              {[["10K+","Petani"],["50K+","Diagnosis AI"],["98%","Akurasi"]].map(([n,l]) => (
+              {[
+                [stats ? formatCount(stats.users) : "...", "Petani Terdaftar"],
+                [stats ? formatCount(stats.diagnoses) : "...", "Diagnosis AI"],
+                ["98%", "Akurasi Model"],
+              ].map(([n, l]) => (
                 <div key={l}>
                   <p className="text-2xl font-bold lg:text-3xl">{n}</p>
                   <p className="text-xs text-muted-foreground">{l}</p>

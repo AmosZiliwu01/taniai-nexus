@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import Swal from "sweetalert2";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWeatherSummary, useWeather } from "@/hooks/useWeather";
 import { supabase } from "@/integrations/supabase/client";
@@ -280,6 +279,10 @@ function CommentItem({ comment, postId, currentUserId, onReply, depth = 0, isExp
   const hasReplies = comment.replies.length > 0;
   const deleteComment = useMutation({
     mutationFn: async () => {
+      // DB sudah punya ON DELETE CASCADE di parent_id FK —
+      // cukup hapus komentar ini, semua balasannya otomatis ikut terhapus di DB.
+      // RLS "Users delete own comments" berlaku untuk baris ini saja;
+      // cascade terjadi di DB level (bypass RLS) sehingda balasan user lain pun ikut terhapus.
       const { error } = await supabase.from("community_comments").delete().eq("id", comment.id);
       if (error) throw error;
       const { count: commCount } = await supabase.from("community_comments").select("*", { count: "exact", head: true }).eq("post_id", postId);
@@ -295,6 +298,7 @@ function CommentItem({ comment, postId, currentUserId, onReply, depth = 0, isExp
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const [showDeleteCommentModal, setShowDeleteCommentModal] = useState(false);
   const handleReplyClick = () => {
     const rootParentId = depth === 0 ? comment.id : comment.root_parent_id ?? comment.id;
     onReply({ commentId: comment.id, name, rootParentId });
@@ -313,7 +317,7 @@ function CommentItem({ comment, postId, currentUserId, onReply, depth = 0, isExp
         <div className="flex items-center gap-3 mt-1 px-1 flex-wrap">
           <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(parseISO(comment.created_at), { addSuffix: true, locale: idLocale })}</span>
           <button onClick={handleReplyClick} className="text-[10px] font-semibold text-muted-foreground hover:text-primary flex items-center gap-0.5"><Reply className="h-3 w-3" /> Balas</button>
-          {isOwn && <button onClick={async () => { const result = await Swal.fire({ icon: "warning", title: "Hapus Komentar?", text: "Komentar yang dihapus tidak bisa dipulihkan.", confirmButtonText: "Ya, Hapus", cancelButtonText: "Batal", showCancelButton: true, confirmButtonColor: "#dc2626", cancelButtonColor: "#6b7280", customClass: { popup: "!rounded-2xl !font-sans", confirmButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold", cancelButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold" }, reverseButtons: true }); if (result.isConfirmed) deleteComment.mutate(); }} className="text-[10px] font-semibold text-muted-foreground hover:text-destructive">Hapus</button>}
+          {isOwn && <button onClick={() => setShowDeleteCommentModal(true)} className="text-[10px] font-semibold text-muted-foreground hover:text-destructive">Hapus</button>}
           {hasReplies && depth === 0 && (
             <button onClick={() => onToggleExpand(comment.id)} className="ml-auto text-[10px] font-semibold text-primary flex items-center gap-0.5">
               {isExpanded ? <><ChevronUp className="h-3 w-3" /> Sembunyikan</> : <><ChevronDown className="h-3 w-3" /> {comment.replies.length} balasan</>}
@@ -328,6 +332,31 @@ function CommentItem({ comment, postId, currentUserId, onReply, depth = 0, isExp
           </div>
         )}
       </div>
+
+      {/* Modal Hapus Komentar */}
+      {showDeleteCommentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card shadow-elevated p-5">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10 mb-4">
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </div>
+            <h3 className="font-bold text-base">Hapus Komentar?</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {!comment.parent_id && comment.replies?.length > 0
+                ? `Komentar ini beserta ${comment.replies.length} balasannya akan dihapus permanen.`
+                : "Komentar ini akan dihapus permanen dan tidak bisa dipulihkan."}
+            </p>
+            <div className="mt-5 flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteCommentModal(false)} disabled={deleteComment.isPending}>
+                Batal
+              </Button>
+              <Button variant="destructive" className="flex-1" onClick={() => { deleteComment.mutate(); setShowDeleteCommentModal(false); }} disabled={deleteComment.isPending}>
+                {deleteComment.isPending ? "Menghapus..." : "Hapus"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -616,6 +645,8 @@ function PostCard({ post, currentUserId, currentUser, isAdmin = false }: { post:
   const [reportReason, setReportReason] = useState("");
   const [showReportModal, setShowReportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeletePostModal, setShowDeletePostModal] = useState(false);
+  const [showFlaggedModal, setShowFlaggedModal] = useState(false);
   const [editTitle, setEditTitle] = useState(post.title);
   const [editContent, setEditContent] = useState("");
   const [editSaving, setEditSaving] = useState(false);
@@ -798,19 +829,7 @@ Postingan "${post.title}" ditandai oleh admin karena: ${reason}. Harap perbarui 
                       <span
                         className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-semibold text-destructive border border-destructive/10 cursor-pointer hover:bg-destructive/20 transition-colors"
                         title={post.flagged_reason ? `Alasan: ${post.flagged_reason}` : "Postingan ini sedang ditinjau oleh admin"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          Swal.fire({
-                            icon: "warning",
-                            title: "Postinganmu Ditandai",
-                            html: post.flagged_reason
-                              ? `<p>Postinganmu ditandai oleh admin dengan alasan:</p><p class="mt-2 font-semibold text-destructive">${post.flagged_reason}</p><p class="mt-3 text-sm text-muted-foreground">Perbarui konten untuk menghapus tanda ini.</p>`
-                              : "<p>Postinganmu sedang ditinjau oleh admin.</p>",
-                            confirmButtonText: "Mengerti",
-                            confirmButtonColor: "#d97706",
-                            customClass: { popup: "!rounded-2xl !font-sans", confirmButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold" },
-                          });
-                        }}
+                        onClick={(e) => { e.stopPropagation(); setShowFlaggedModal(true); }}
                       >
                         ⚠️ Ditinjau
                       </span>
@@ -832,7 +851,7 @@ Postingan "${post.title}" ditandai oleh admin karena: ${reason}. Harap perbarui 
                     <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                     <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-xl border border-border bg-card shadow-elevated py-1">
                       <button onClick={() => { setMenuOpen(false); setEditTitle(post.title); setEditContent(post.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"><Edit className="h-3.5 w-3.5" /> Update postingan</button>
-                      <button onClick={async () => { setMenuOpen(false); const result = await Swal.fire({ icon: "warning", title: "Hapus Postingan?", text: "Postingan yang dihapus tidak bisa dipulihkan.", confirmButtonText: "Ya, Hapus", cancelButtonText: "Batal", showCancelButton: true, confirmButtonColor: "#dc2626", cancelButtonColor: "#6b7280", customClass: { popup: "!rounded-2xl !font-sans", confirmButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold", cancelButton: "!rounded-xl !px-5 !py-2 !text-sm !font-semibold" }, reverseButtons: true }); if (result.isConfirmed) deletePost.mutate(); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Hapus postingan</button>
+                      <button onClick={() => { setMenuOpen(false); setShowDeletePostModal(true); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Hapus postingan</button>
                     </div>
                   </>
                 )}
@@ -957,7 +976,7 @@ Postingan "${post.title}" ditandai oleh admin karena: ${reason}. Harap perbarui 
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Update Postingan</h3>
-              {post.is_flagged && <span className="text-xs rounded-full bg-warning/20 text-warning px-2 py-0.5 border border-warning/30">⚠️ Postingan ditandai — perbarui untuk hapus tanda</span>}
+              {post.is_flagged && <span className="text-xs rounded-full bg-warning/20 text-warning px-2 py-0.5 border border-warning/30">⚠️ Postingan ditandai — simpan untuk hapus tanda</span>}
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Judul</label>
@@ -971,6 +990,53 @@ Postingan "${post.title}" ditandai oleh admin karena: ${reason}. Harap perbarui 
               <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Batal</Button>
               <Button className="flex-1" onClick={handleEditSave} disabled={editSaving || !editTitle.trim() || !editContent.trim()}>
                 {editSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Menyimpan...</> : "Simpan Perubahan"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Postingan Ditandai */}
+      {showFlaggedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowFlaggedModal(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card shadow-elevated p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning/10 mb-4">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+            </div>
+            <h3 className="font-bold text-base">Postinganmu Ditandai</h3>
+            {post.flagged_reason ? (
+              <>
+                <p className="mt-1 text-sm text-muted-foreground">Postinganmu ditandai oleh admin dengan alasan:</p>
+                <p className="mt-2 text-sm font-semibold text-destructive">{post.flagged_reason}</p>
+                <p className="mt-3 text-xs text-muted-foreground">Perbarui konten postinganmu untuk menghapus tanda ini.</p>
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">Postinganmu sedang ditinjau oleh tim moderasi kami.</p>
+            )}
+            <div className="mt-5">
+              <Button className="w-full" onClick={() => setShowFlaggedModal(false)}>Mengerti</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Hapus Postingan */}
+      {showDeletePostModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card shadow-elevated p-5">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10 mb-4">
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </div>
+            <h3 className="font-bold text-base">Hapus Postingan?</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">"{post.title}"</span> akan dihapus permanen beserta semua komentarnya.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowDeletePostModal(false)} disabled={deletePost.isPending}>
+                Batal
+              </Button>
+              <Button variant="destructive" className="flex-1" onClick={() => { deletePost.mutate(); setShowDeletePostModal(false); }} disabled={deletePost.isPending}>
+                {deletePost.isPending ? "Menghapus..." : "Hapus"}
               </Button>
             </div>
           </div>

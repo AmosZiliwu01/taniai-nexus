@@ -11,7 +11,7 @@ import {
   Leaf, MessageCircle, CloudSun, TrendingUp, TrendingDown, Minus,
   AlertTriangle, Plus, Sprout, ClipboardList, ShoppingCart, Users,
   Sun, Cloud, CloudRain, CloudLightning, Thermometer, Droplets, Wind,
-  Eye, Clock, RefreshCw, MapPin, CheckCircle2,
+  Eye, Clock, RefreshCw, MapPin, CheckCircle2, WifiOff,
 } from "lucide-react";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
@@ -122,16 +122,19 @@ function Dashboard() {
   });
 
   // Market prices — untuk tanaman user
-  const { data: marketData } = useQuery({
+  const { data: marketData, isError: marketError, refetch: refetchMarket, isFetching: marketFetching } = useQuery({
     queryKey: ["market-dashboard", activePlants.map((p) => p.name).join(",")],
     queryFn: () => fetchMarketData(profile?.location ?? "Nasional"),
     staleTime: 30 * 60 * 1000,
     enabled: activePlants.length > 0,
+    retry: 1,
   });
 
-  const relevantPrices = marketData
+  // Hanya tampilkan jika data real-time dari BPN, bukan fallback/referensi
+  const relevantPrices = marketData?.isRealtime
     ? getPricesForCrops(marketData.prices, activePlants.map((p) => p.name)).slice(0, 4)
     : [];
+  const showMarketError = !marketData?.isRealtime && (marketError || activePlants.length > 0);
 
   // Stats
   const diagnosisCount = recentDiagnoses.length;
@@ -305,7 +308,7 @@ function Dashboard() {
           )}
 
           {/* Harga Pasar (jika ada tanaman) */}
-          {relevantPrices.length > 0 && (
+          {activePlants.length > 0 && (
             <div className="rounded-2xl border border-border bg-card shadow-card">
               <div className="flex items-center justify-between border-b border-border px-5 py-4">
                 <h2 className="font-semibold flex items-center gap-2">
@@ -314,26 +317,50 @@ function Dashboard() {
                 </h2>
                 <Link to="/market" className="text-xs font-medium text-primary hover:underline">Semua harga →</Link>
               </div>
-              <div className="divide-y divide-border">
-                {relevantPrices.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 px-5 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.region}</p>
+              {/* Loading */}
+              {marketFetching && !marketData && (
+                <div className="flex items-center justify-center gap-2 px-5 py-8 text-sm text-muted-foreground">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Memuat harga pasar...
+                </div>
+              )}
+              {/* Error / tidak tersedia */}
+              {!marketFetching && (marketError || !marketData?.isRealtime) && (
+                <div className="flex flex-col items-center gap-2 px-5 py-7 text-center">
+                  <WifiOff className="h-6 w-6 text-muted-foreground/50" />
+                  <p className="text-sm font-medium text-muted-foreground">Data harga tidak tersedia</p>
+                  <p className="text-xs text-muted-foreground/70 max-w-[220px]">Server BPN sedang tidak dapat dijangkau. Data hanya ditampilkan dari sumber resmi.</p>
+                  <button
+                    onClick={() => refetchMarket()}
+                    className="mt-1 flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Coba Lagi
+                  </button>
+                </div>
+              )}
+              {/* Data */}
+              {!marketFetching && marketData?.isRealtime && relevantPrices.length > 0 && (
+                <div className="divide-y divide-border">
+                  {relevantPrices.map((p) => (
+                    <div key={p.id} className="flex items-center gap-3 px-5 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.region}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold">Rp {p.price.toLocaleString("id-ID")}/{p.unit}</p>
+                        <span className={cn(
+                          "inline-flex items-center gap-0.5 text-[10px] font-semibold",
+                          p.trend === "up" ? "text-success" : p.trend === "down" ? "text-destructive" : "text-muted-foreground"
+                        )}>
+                          {p.trend === "up" ? <TrendingUp className="h-3 w-3" /> : p.trend === "down" ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                          {Math.abs(p.changePercent).toFixed(1)}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold">Rp {p.price.toLocaleString("id-ID")}/{p.unit}</p>
-                      <span className={cn(
-                        "inline-flex items-center gap-0.5 text-[10px] font-semibold",
-                        p.trend === "up" ? "text-success" : p.trend === "down" ? "text-destructive" : "text-muted-foreground"
-                      )}>
-                        {p.trend === "up" ? <TrendingUp className="h-3 w-3" /> : p.trend === "down" ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                        {Math.abs(p.changePercent).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
