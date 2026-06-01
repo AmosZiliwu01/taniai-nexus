@@ -1,0 +1,14 @@
+# Abaikan semua file di folder supabase/functions
+supabase/functions/
+
+# Abaikan folder build/dist
+dist/
+build/
+node_modules/
+
+# Abaikan file config
+*.config.js
+*.config.ts
+
+# Abaikan folder whatsapp
+taniai-whatsapp/
