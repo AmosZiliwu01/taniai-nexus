@@ -8,6 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
+  AlertTriangle,
   Bold,
   ChevronDown, ChevronUp,
   Edit,
@@ -1070,6 +1071,14 @@ function Community() {
     sessionStorage.removeItem("share_preset_key");
     setPresetContent(content);
     setPresetImageUrl(image || null);
+
+    // Scroll ke atas supaya form langsung terlihat
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      // Focus ke textarea form
+      const textarea = document.querySelector<HTMLTextAreaElement>("#community-post-form textarea");
+      if (textarea) textarea.focus();
+    }, 100);
   }, [shareKey]);
 
   useEffect(() => {
@@ -1205,12 +1214,14 @@ function Community() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-5">
-          <CreatePostForm
-            key={`${shareKey ?? "default"}-${defaultContent.slice(0, 20)}`}
-            defaultContent={defaultContent}
-            defaultImageUrl={defaultImage}
-            currentUser={currentUser}
-          />
+          <div id="community-post-form">
+            <CreatePostForm
+              key={`${shareKey ?? "default"}-${defaultContent.slice(0, 20)}`}
+              defaultContent={defaultContent}
+              defaultImageUrl={defaultImage}
+              currentUser={currentUser}
+            />
+          </div>
           {isLoading ? (
             <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}</div>
           ) : posts.length === 0 ? (
