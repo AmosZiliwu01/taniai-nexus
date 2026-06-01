@@ -397,38 +397,126 @@ function DiagnosisCard({ result, imageUrl, plantType, plantPart, onShare, onClos
   const severityColor = result.severity === "Berat" ? "bg-destructive/5" : result.severity === "Sedang" ? "bg-warning/5" : "bg-success/5";
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-      <div className={cn("p-4 flex items-center gap-4", severityColor)}>
-        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full", result.severity === "Berat" ? "bg-destructive/15" : result.severity === "Sedang" ? "bg-warning/15" : "bg-success/15")}>
-          {result.severity === "Berat" ? <AlertTriangle className="h-6 w-6 text-destructive" /> : result.severity === "Sedang" ? <Info className="h-6 w-6 text-warning" /> : <CheckCircle className="h-6 w-6 text-success" />}
+      {/* ── Header ── */}
+      <div className={cn("p-4", severityColor)}>
+        {/* Row 1: icon + judul + close */}
+        <div className="flex items-start gap-3">
+          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", result.severity === "Berat" ? "bg-destructive/15" : result.severity === "Sedang" ? "bg-warning/15" : "bg-success/15")}>
+            {result.severity === "Berat" ? <AlertTriangle className="h-5 w-5 text-destructive" /> : result.severity === "Sedang" ? <Info className="h-5 w-5 text-warning" /> : <CheckCircle className="h-5 w-5 text-success" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Kemungkinan besar disebabkan oleh</p>
+            <h2 className="text-base font-bold leading-snug break-words">{result.diagnosis}</h2>
+          </div>
+          {onClose && (
+            <button onClick={onClose} className="shrink-0 rounded-full p-1 hover:bg-black/10">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Kemungkinan besar disebabkan oleh</p>
-          <h2 className="text-lg font-bold leading-tight truncate">{result.diagnosis}</h2>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className={cn("text-[11px] font-semibold rounded-full px-2 py-0.5", result.confidence >= 75 ? "text-success" : "text-warning")}>✅ {result.confidence}% yakin</span>
-            {result.recovery_days && <span className="text-[11px] text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> ~{result.recovery_days} hari pemulihan</span>}
+
+        {/* Row 2: confidence + recovery + score badge */}
+        <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className={cn("text-xs font-semibold", result.confidence >= 75 ? "text-success" : "text-warning")}>
+              ✅ {result.confidence}% yakin
+            </span>
+            {result.recovery_days && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3" /> ~{result.recovery_days} hari pemulihan
+              </span>
+            )}
+          </div>
+          <div className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-bold tabular-nums", result.confidence >= 75 ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>
+            {result.confidence}% Tingkat Keyakinan
           </div>
         </div>
-        <div className="shrink-0 text-center">
-          <div className={cn("text-2xl font-bold tabular-nums", result.confidence >= 75 ? "text-success" : "text-warning")}>{result.confidence}%</div>
-          <p className="text-[10px] text-muted-foreground">Tingkat<br />Keyakinan</p>
-        </div>
-        {onClose && <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 -mr-1 -mt-8" onClick={onClose}><X className="h-3.5 w-3.5" /></Button>}
       </div>
+
+      {/* ── Body ── */}
       <div className="p-4 space-y-4">
-        {imageUrl && <div className="overflow-hidden rounded-xl"><img src={imageUrl} alt="Tanaman" className="w-full max-h-48 object-cover" /></div>}
-        {result.mismatch_warning && <div className="flex gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3"><AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" /><p className="text-xs text-amber-800">{result.mismatch_warning}</p></div>}
-        {result.confidence_note && <div className="flex gap-2 rounded-xl bg-warning/5 border border-warning/20 p-3"><Info className="h-4 w-4 text-warning shrink-0 mt-0.5" /><p className="text-xs text-warning">{result.confidence_note}</p></div>}
-        <div><h3 className="text-sm font-semibold mb-1.5">Ringkasan</h3><p className="text-sm text-muted-foreground leading-relaxed">{result.description}</p>{result.cause && <p className="text-sm mt-1.5"><span className="font-medium">Penyebab utama: </span><span className="text-muted-foreground">{result.cause}</span></p>}</div>
-        {(result.symptoms?.length || result.cause_detail) && (
-          <div className="grid grid-cols-2 gap-3">
-            {result.symptoms && result.symptoms.length > 0 && (<div className="rounded-xl border border-border bg-muted/20 p-3"><p className="text-[11px] font-semibold text-muted-foreground mb-2">Gejala yang Terlihat</p><ul className="space-y-1">{result.symptoms.map((s, i) => <li key={i} className="flex items-start gap-1.5 text-xs"><CheckCircle className="h-3 w-3 text-success shrink-0 mt-0.5" /> {s}</li>)}</ul></div>)}
-            {result.cause_detail && (<div className="rounded-xl border border-border bg-muted/20 p-3"><p className="text-[11px] font-semibold text-muted-foreground mb-2">Penyebab</p><p className="text-xs text-muted-foreground leading-relaxed">{result.cause_detail}</p></div>)}
+        {imageUrl && (
+          <div className="overflow-hidden rounded-xl">
+            <img src={imageUrl} alt="Tanaman" className="w-full max-h-52 object-cover" />
           </div>
         )}
+        {result.mismatch_warning && (
+          <div className="flex gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800 leading-relaxed">{result.mismatch_warning}</p>
+          </div>
+        )}
+        {result.confidence_note && (
+          <div className="flex gap-2 rounded-xl bg-warning/5 border border-warning/20 p-3">
+            <Info className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+            <p className="text-xs text-warning leading-relaxed">{result.confidence_note}</p>
+          </div>
+        )}
+
+        {/* Ringkasan */}
+        <div>
+          <h3 className="text-sm font-semibold mb-1.5">Ringkasan</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">{result.description}</p>
+          {result.cause && (
+            <p className="text-sm mt-1.5">
+              <span className="font-medium">Penyebab utama: </span>
+              <span className="text-muted-foreground">{result.cause}</span>
+            </p>
+          )}
+        </div>
+
+        {/* Gejala + Penyebab — 1 kolom di mobile, 2 kolom di sm+ */}
+        {(result.symptoms?.length || result.cause_detail) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {result.symptoms && result.symptoms.length > 0 && (
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <p className="text-[11px] font-semibold text-muted-foreground mb-2">Gejala yang Terlihat</p>
+                <ul className="space-y-1">
+                  {result.symptoms.map((s, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-xs">
+                      <CheckCircle className="h-3 w-3 text-success shrink-0 mt-0.5" /> {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {result.cause_detail && (
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <p className="text-[11px] font-semibold text-muted-foreground mb-2">Penyebab</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{result.cause_detail}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         <SeverityBadge severity={result.severity} score={result.severity_score} />
-        <div><h3 className="text-sm font-semibold mb-2">Rekomendasi Tindakan</h3><div className="rounded-xl border border-border overflow-hidden divide-y divide-border"><ActionRow icon={<span className="text-base">⚡</span>} label="Tindakan Awal (24-48 jam)" detail={result.initial_action} /><ActionRow icon={<span className="text-base">🛡️</span>} label="Penanganan Lengkap" detail={result.solution} />{result.fertilizer && <ActionRow icon={<span className="text-base">🌱</span>} label="Pupuk Dianjurkan" detail={result.fertilizer} />}<ActionRow icon={<span className="text-base">🔍</span>} label="Tindak Lanjut" detail={result.follow_up} />{result.pesticide && <ActionRow icon={<span className="text-base">💊</span>} label="Pestisida/Fungisida" detail={result.pesticide} />}{result.weather_note && <ActionRow icon={<span className="text-base">🌤️</span>} label="Tips Cuaca" detail={result.weather_note} />}</div></div>
-        <div className="flex gap-2">{onShare && <Button onClick={onShare} variant="outline" size="sm" className="flex-1 gap-1.5 text-xs"><Share2 className="h-3.5 w-3.5" /> Bagikan ke Komunitas</Button>}<Button asChild variant="outline" size="sm" className="flex-1 gap-1.5 text-xs"><Link to="/assistant"><MessageCircle className="h-3.5 w-3.5" /> Tanya AI Lebih Lanjut</Link></Button></div>
+
+        {/* Rekomendasi */}
+        <div>
+          <h3 className="text-sm font-semibold mb-2">Rekomendasi Tindakan</h3>
+          <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
+            <ActionRow icon={<span className="text-base">⚡</span>} label="Tindakan Awal (24-48 jam)" detail={result.initial_action} />
+            <ActionRow icon={<span className="text-base">🛡️</span>} label="Penanganan Lengkap" detail={result.solution} />
+            {result.fertilizer && <ActionRow icon={<span className="text-base">💊</span>} label="Pupuk Dianjurkan" detail={result.fertilizer} />}
+            <ActionRow icon={<span className="text-base">🔍</span>} label="Tindak Lanjut" detail={result.follow_up} />
+            {result.pesticide && <ActionRow icon={<span className="text-base">💊</span>} label="Pestisida/Fungisida" detail={result.pesticide} />}
+            {result.weather_note && <ActionRow icon={<span className="text-base">🌤️</span>} label="Tips Cuaca" detail={result.weather_note} />}
+          </div>
+        </div>
+
+        {/* Tombol aksi — stack di mobile */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          {onShare && (
+            <Button onClick={onShare} variant="outline" size="sm" className="flex-1 gap-1.5 text-xs">
+              <Share2 className="h-3.5 w-3.5" /> Bagikan ke Komunitas
+            </Button>
+          )}
+          <Button asChild variant="outline" size="sm" className="flex-1 gap-1.5 text-xs">
+            <Link to="/assistant">
+              <MessageCircle className="h-3.5 w-3.5" /> Tanya AI Lebih Lanjut
+            </Link>
+          </Button>
+        </div>
       </div>
     </div>
   );
