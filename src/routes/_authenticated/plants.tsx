@@ -3,15 +3,33 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { usePlants, useAddPlant, useDeletePlant, useUpdatePlantStatus, type UserPlantWithAge } from "@/hooks/useUserPlants";
+import {
+  usePlants,
+  useAddPlant,
+  useDeletePlant,
+  useUpdatePlantStatus,
+  type UserPlantWithAge,
+} from "@/hooks/useUserPlants";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
-  Plus, Trash2, Sprout, MapPin, Calendar, X,
-  Edit2, Droplets, Sun, Check, MessageCircle, StickyNote,
-  ChevronDown, ChevronUp, Search,
+  Plus,
+  Trash2,
+  Sprout,
+  MapPin,
+  Calendar,
+  X,
+  Edit2,
+  Droplets,
+  Sun,
+  Check,
+  MessageCircle,
+  StickyNote,
+  ChevronDown,
+  ChevronUp,
+  Search,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
@@ -21,20 +39,32 @@ export const Route = createFileRoute("/_authenticated/plants")({
   component: PlantsPage,
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface PlantNote {
   id: string;
   text: string;
   updated_at: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
+// Constants
 const PLANT_TYPES_LIST = [
-  "Padi", "Jagung", "Cabai", "Tomat", "Kedelai", "Bawang Merah",
-  "Bawang Putih", "Kentang", "Singkong", "Ubi Jalar", "Kopi",
-  "Kakao", "Pisang", "Mangga", "Jeruk", "Pepaya", "Tebu", "Lainnya",
+  "Padi",
+  "Jagung",
+  "Cabai",
+  "Tomat",
+  "Kedelai",
+  "Bawang Merah",
+  "Bawang Putih",
+  "Kentang",
+  "Singkong",
+  "Ubi Jalar",
+  "Kopi",
+  "Kakao",
+  "Pisang",
+  "Mangga",
+  "Jeruk",
+  "Pepaya",
+  "Tebu",
+  "Lainnya",
 ];
 
 const SOIL_OPTIONS = [
@@ -49,8 +79,7 @@ const STATUS_OPTIONS = [
   { value: "Mati", color: "bg-muted text-muted-foreground border-border" },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
+// Helpers
 function getPlantEmoji(name: string): string {
   const n = name.toLowerCase();
   if (n.includes("padi") || n.includes("beras")) return "🌾";
@@ -94,8 +123,7 @@ function buildAIQuery(plant: UserPlantWithAge, notes: PlantNote[]): string {
   return `${base} Apa saran perawatan dan hal yang perlu diwaspadai saat ini?`;
 }
 
-// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
-
+// Delete Confirm Modal
 function DeleteConfirmModal({
   plantName,
   onConfirm,
@@ -115,18 +143,14 @@ function DeleteConfirmModal({
         </div>
         <h3 className="font-bold text-base">Hapus Tanaman?</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{plantName}</span> akan dihapus permanen beserta semua catatannya.
+          <span className="font-medium text-foreground">{plantName}</span> akan dihapus permanen
+          beserta semua catatannya.
         </p>
         <div className="mt-5 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isPending}>
             Batal
           </Button>
-          <Button
-            variant="destructive"
-            className="flex-1"
-            onClick={onConfirm}
-            disabled={isPending}
-          >
+          <Button variant="destructive" className="flex-1" onClick={onConfirm} disabled={isPending}>
             {isPending ? "Menghapus..." : "Hapus"}
           </Button>
         </div>
@@ -135,8 +159,7 @@ function DeleteConfirmModal({
   );
 }
 
-// ─── Custom Dropdown dengan Search ───────────────────────────────────────────
-
+// Custom Dropdown dengan Search
 interface PlantDropdownProps {
   value: string;
   onChange: (value: string) => void;
@@ -150,12 +173,13 @@ function PlantDropdown({ value, onChange, onCustomChange }: PlantDropdownProps) 
 
   // Filter tanaman berdasarkan search
   const filteredPlants = PLANT_TYPES_LIST.filter((plant) =>
-    plant.toLowerCase().includes(search.toLowerCase())
+    plant.toLowerCase().includes(search.toLowerCase()),
   );
 
   // Cek apakah search query adalah "Lainnya" atau tidak ditemukan
-  const isSearchNotFound = search.trim() !== "" && 
-    !PLANT_TYPES_LIST.some(plant => plant.toLowerCase() === search.trim().toLowerCase()) &&
+  const isSearchNotFound =
+    search.trim() !== "" &&
+    !PLANT_TYPES_LIST.some((plant) => plant.toLowerCase() === search.trim().toLowerCase()) &&
     search.trim().toLowerCase() !== "lainnya";
 
   useEffect(() => {
@@ -171,14 +195,13 @@ function PlantDropdown({ value, onChange, onCustomChange }: PlantDropdownProps) 
 
   const handleSelect = (plant: string) => {
     onChange(plant);
-    onCustomChange?.(""); // reset custom
+    onCustomChange?.("");
     setIsOpen(false);
     setSearch("");
   };
 
   const handleUseCustomSearch = () => {
     if (search.trim()) {
-      // Langsung kirim nama tanaman tanpa "Lainnya"
       onChange(search.trim());
       onCustomChange?.(search.trim());
       setIsOpen(false);
@@ -214,7 +237,11 @@ function PlantDropdown({ value, onChange, onCustomChange }: PlantDropdownProps) 
             <span className="text-muted-foreground">— Pilih atau ketik jenis tanaman —</span>
           )}
         </span>
-        {isOpen ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+        {isOpen ? (
+          <ChevronUp className="h-4 w-4 shrink-0" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0" />
+        )}
       </button>
 
       {isOpen && (
@@ -249,7 +276,7 @@ function PlantDropdown({ value, onChange, onCustomChange }: PlantDropdownProps) 
                     onClick={() => handleSelect(plant)}
                     className={cn(
                       "flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left hover:bg-muted/50",
-                      displayValue === plant && "bg-primary/8 text-primary font-medium"
+                      displayValue === plant && "bg-primary/8 text-primary font-medium",
                     )}
                   >
                     <span className="text-base w-6 text-center">{getPlantEmoji(plant)}</span>
@@ -276,7 +303,9 @@ function PlantDropdown({ value, onChange, onCustomChange }: PlantDropdownProps) 
                     <span>
                       Gunakan "<span className="font-medium text-primary">{search}</span>"
                     </span>
-                    <span className="text-[10px] text-muted-foreground">(tanaman tidak terdaftar)</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      (tanaman tidak terdaftar)
+                    </span>
                   </div>
                   <Plus className="h-3.5 w-3.5 text-primary shrink-0" />
                 </button>
@@ -303,12 +332,12 @@ function PlantDropdown({ value, onChange, onCustomChange }: PlantDropdownProps) 
   );
 }
 
-// ─── Add Plant Modal ──────────────────────────────────────────────────────────
+// Add Plant Modal
 
 function AddPlantModal({ onClose }: { onClose: () => void }) {
   const addPlant = useAddPlant();
   const [form, setForm] = useState({
-    name: "",        // langsung berisi nama tanaman (bisa dari list atau custom)
+    name: "",
     plant_date: format(new Date(), "yyyy-MM-dd"),
     soil_condition: "Normal",
     notes: "",
@@ -340,7 +369,9 @@ function AddPlantModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
             <h2 className="font-bold text-base">Tambah Tanaman</h2>
-            <p className="text-xs text-muted-foreground">Data lengkap untuk rekomendasi AI yang akurat</p>
+            <p className="text-xs text-muted-foreground">
+              Data lengkap untuk rekomendasi AI yang akurat
+            </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
             <X className="h-4 w-4" />
@@ -353,10 +384,7 @@ function AddPlantModal({ onClose }: { onClose: () => void }) {
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Nama Tanaman *
             </label>
-            <PlantDropdown 
-              value={form.name} 
-              onChange={handlePlantChange}
-            />
+            <PlantDropdown value={form.name} onChange={handlePlantChange} />
           </div>
 
           {/* Tanggal tanam */}
@@ -388,7 +416,7 @@ function AddPlantModal({ onClose }: { onClose: () => void }) {
                     "flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-xs font-medium transition-all text-center",
                     form.soil_condition === s.value
                       ? "border-primary bg-primary/5 text-primary"
-                      : "border-border bg-muted/20 hover:border-primary/30"
+                      : "border-border bg-muted/20 hover:border-primary/30",
                   )}
                 >
                   <span className="text-xl">{s.icon}</span>
@@ -431,7 +459,7 @@ function AddPlantModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Notes Section ─────────────────────────────────────────────────────────────
+// Notes Section
 
 interface NotesSectionProps {
   plantId: string;
@@ -482,7 +510,7 @@ function NotesSection({ plantId, rawNotes, onNotesChange }: NotesSectionProps) {
   const handleEdit = (id: string) => {
     if (!editText.trim()) return;
     const updated = notes.map((n) =>
-      n.id === id ? { ...n, text: editText.trim(), updated_at: new Date().toISOString() } : n
+      n.id === id ? { ...n, text: editText.trim(), updated_at: new Date().toISOString() } : n,
     );
     persistNotes.mutate(updated, {
       onSuccess: () => {
@@ -505,7 +533,9 @@ function NotesSection({ plantId, rawNotes, onNotesChange }: NotesSectionProps) {
         <span className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
           <StickyNote className="h-3 w-3" /> Catatan
           {notes.length > 0 && (
-            <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{notes.length}</span>
+            <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[9px]">
+              {notes.length}
+            </span>
           )}
         </span>
         {!addingNew && (
@@ -554,7 +584,10 @@ function NotesSection({ plantId, rawNotes, onNotesChange }: NotesSectionProps) {
                 <p className="flex-1 text-xs leading-relaxed">{note.text}</p>
                 <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/note:opacity-100 transition-opacity">
                   <button
-                    onClick={() => { setEditingId(note.id); setEditText(note.text); }}
+                    onClick={() => {
+                      setEditingId(note.id);
+                      setEditText(note.text);
+                    }}
                     className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     title="Edit catatan"
                   >
@@ -569,7 +602,7 @@ function NotesSection({ plantId, rawNotes, onNotesChange }: NotesSectionProps) {
                   </button>
                 </div>
               </div>
-            )
+            ),
           )}
         </div>
       )}
@@ -584,8 +617,14 @@ function NotesSection({ plantId, rawNotes, onNotesChange }: NotesSectionProps) {
             placeholder="Varietas, kondisi khusus, dll..."
             className="flex-1 resize-none rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAdd(); }
-              if (e.key === "Escape") { setAddingNew(false); setNewText(""); }
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleAdd();
+              }
+              if (e.key === "Escape") {
+                setAddingNew(false);
+                setNewText("");
+              }
             }}
           />
           <div className="flex flex-col gap-1 shrink-0">
@@ -597,7 +636,10 @@ function NotesSection({ plantId, rawNotes, onNotesChange }: NotesSectionProps) {
               <Check className="h-3 w-3" />
             </button>
             <button
-              onClick={() => { setAddingNew(false); setNewText(""); }}
+              onClick={() => {
+                setAddingNew(false);
+                setNewText("");
+              }}
               className="rounded-lg bg-muted p-1.5 text-muted-foreground hover:bg-muted/80 transition-colors"
             >
               <X className="h-3 w-3" />
@@ -613,7 +655,7 @@ function NotesSection({ plantId, rawNotes, onNotesChange }: NotesSectionProps) {
   );
 }
 
-// ─── Plant Card ────────────────────────────────────────────────────────────────
+// Plant Card
 
 function PlantCard({ plant }: { plant: UserPlantWithAge }) {
   const navigate = useNavigate();
@@ -624,14 +666,14 @@ function PlantCard({ plant }: { plant: UserPlantWithAge }) {
   const [currentNotes, setCurrentNotes] = useState<PlantNote[]>(() => parseNotes(plant.notes));
 
   const emoji = getPlantEmoji(plant.name);
-  const statusColor = STATUS_OPTIONS.find((s) => s.value === plant.status)?.color
-    ?? "bg-muted text-muted-foreground border-border";
+  const statusColor =
+    STATUS_OPTIONS.find((s) => s.value === plant.status)?.color ??
+    "bg-muted text-muted-foreground border-border";
 
   const handleDelete = () => {
     deletePlant.mutate(plant.id, {
       onSuccess: () => {
         setShowDeleteModal(false);
-        // toast sudah ditampilkan oleh useDeletePlant
       },
       onError: (e: Error) => {
         toast.error(e.message, { position: "top-right" });
@@ -648,12 +690,16 @@ function PlantCard({ plant }: { plant: UserPlantWithAge }) {
   return (
     <>
       <div className="group rounded-2xl border border-border bg-card shadow-card overflow-hidden hover:shadow-elevated transition-all">
-        <div className={cn(
-          "h-1.5",
-          plant.status === "Aktif" ? "bg-gradient-to-r from-success to-emerald-400"
-            : plant.status === "Panen" ? "bg-gradient-to-r from-blue-500 to-sky-400"
-            : "bg-muted"
-        )} />
+        <div
+          className={cn(
+            "h-1.5",
+            plant.status === "Aktif"
+              ? "bg-gradient-to-r from-success to-emerald-400"
+              : plant.status === "Panen"
+                ? "bg-gradient-to-r from-blue-500 to-sky-400"
+                : "bg-muted",
+          )}
+        />
 
         <div className="p-4">
           <div className="flex items-start justify-between gap-3">
@@ -670,7 +716,10 @@ function PlantCard({ plant }: { plant: UserPlantWithAge }) {
             <div className="relative shrink-0">
               <button
                 onClick={() => setShowStatusMenu((v) => !v)}
-                className={cn("rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors", statusColor)}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors",
+                  statusColor,
+                )}
               >
                 {plant.status}
               </button>
@@ -687,7 +736,7 @@ function PlantCard({ plant }: { plant: UserPlantWithAge }) {
                         }}
                         className={cn(
                           "w-full px-3 py-2 text-left text-xs font-medium hover:bg-muted/50 transition-colors",
-                          plant.status === s.value && "bg-muted/30"
+                          plant.status === s.value && "bg-muted/30",
                         )}
                       >
                         {s.value}
@@ -702,7 +751,9 @@ function PlantCard({ plant }: { plant: UserPlantWithAge }) {
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Calendar className="h-3.5 w-3.5 shrink-0" />
-              <span>Tanam: {format(parseISO(plant.plant_date), "d MMM yyyy", { locale: idLocale })}</span>
+              <span>
+                Tanam: {format(parseISO(plant.plant_date), "d MMM yyyy", { locale: idLocale })}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Sprout className="h-3.5 w-3.5 shrink-0" />
@@ -726,11 +777,7 @@ function PlantCard({ plant }: { plant: UserPlantWithAge }) {
             </div>
           </div>
 
-          <NotesSection
-            plantId={plant.id}
-            rawNotes={plant.notes}
-            onNotesChange={setCurrentNotes}
-          />
+          <NotesSection plantId={plant.id} rawNotes={plant.notes} onNotesChange={setCurrentNotes} />
 
           <div className="mt-3 flex gap-2">
             <button
@@ -761,14 +808,15 @@ function PlantCard({ plant }: { plant: UserPlantWithAge }) {
   );
 }
 
-// ─── Plants Page ───────────────────────────────────────────────────────────────
+// Plants Page
 
 function PlantsPage() {
   const { data: plants = [], isLoading } = usePlants();
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState<"semua" | "Aktif" | "Panen" | "Mati">("semua");
 
-  const filtered = (filter as string) === "semua" ? plants : plants.filter((p) => p.status === (filter as string));
+  const filtered =
+    (filter as string) === "semua" ? plants : plants.filter((p) => p.status === (filter as string));
   const activePlants = plants.filter((p) => p.status === "Aktif");
   const totalAgeDays = activePlants.reduce((s, p) => s + p.age_days, 0);
   const avgAge = activePlants.length ? Math.round(totalAgeDays / activePlants.length) : 0;
@@ -798,9 +846,16 @@ function PlantsPage() {
             { label: "Total Tanaman", value: plants.length, icon: "🌱" },
             { label: "Sedang Aktif", value: activePlants.length, icon: "✅" },
             { label: "Rata-rata Umur", value: `${avgAge} HST`, icon: "📅" },
-            { label: "Siap Panen", value: plants.filter((p) => p.age_days >= 75 && p.status === "Aktif").length, icon: "🌾" },
+            {
+              label: "Siap Panen",
+              value: plants.filter((p) => p.age_days >= 75 && p.status === "Aktif").length,
+              icon: "🌾",
+            },
           ].map((s) => (
-            <div key={s.label} className="rounded-2xl border border-border bg-card p-4 text-center shadow-card">
+            <div
+              key={s.label}
+              className="rounded-2xl border border-border bg-card p-4 text-center shadow-card"
+            >
               <p className="text-2xl">{s.icon}</p>
               <p className="mt-1 text-xl font-bold">{s.value}</p>
               <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -817,11 +872,10 @@ function PlantsPage() {
               onClick={() => setFilter(f)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors capitalize",
-                filter === f ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                filter === f ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80",
               )}
             >
-              {f}{" "}
-              {f !== "semua" && `(${plants.filter((p) => p.status === (f as string)).length})`}
+              {f} {f !== "semua" && `(${plants.filter((p) => p.status === (f as string)).length})`}
             </button>
           ))}
         </div>
@@ -829,7 +883,9 @@ function PlantsPage() {
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)}
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-64 rounded-2xl" />
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-border bg-card/50 py-16 text-center">

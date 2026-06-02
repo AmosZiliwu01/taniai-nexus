@@ -1,3 +1,4 @@
+// src/routes/_authenticated/plant-doctor.tsx
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePlants } from "@/hooks/useUserPlants";
@@ -809,7 +810,7 @@ function DiagnosisCard({
         </div>
       </div>
 
-      {/* ── Body ── */}
+      {/* Body */}
       <div className="p-4 space-y-4">
         {imageUrl && (
           <div className="overflow-hidden rounded-xl">
@@ -915,18 +916,23 @@ function DiagnosisCard({
         </div>
 
         {/* Tombol aksi — stack di mobile */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {onShare && (
             <Button
               onClick={onShare}
               variant="outline"
               size="sm"
-              className="flex-1 gap-1.5 text-xs"
+              className="w-full gap-1.5 text-xs justify-center"
             >
               <Share2 className="h-3.5 w-3.5" /> Bagikan ke Komunitas
             </Button>
           )}
-          <Button asChild variant="outline" size="sm" className="flex-1 gap-1.5 text-xs">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs justify-center"
+          >
             <Link to="/assistant">
               <MessageCircle className="h-3.5 w-3.5" /> Tanya AI Lebih Lanjut
             </Link>
@@ -963,7 +969,7 @@ function DiagnosisSkeleton() {
   );
 }
 
-// ─── HISTORY SECTION ─────────────────────────────────────────────────────────
+// HISTORY SECTION
 function HistorySection({
   history,
   histLoading,
@@ -1074,8 +1080,7 @@ function HistorySection({
                       deleteHistory.mutate(d.id);
                     }}
                     className={cn(
-                      "rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all",
-                      "opacity-100 md:opacity-0 md:group-hover:opacity-100",
+                      "rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all opacity-100",
                     )}
                     aria-label="Hapus"
                   >
@@ -1091,7 +1096,7 @@ function HistorySection({
   );
 }
 
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+// MAIN COMPONENT
 function DiagnosaTanaman() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -1329,7 +1334,7 @@ function DiagnosaTanaman() {
 
         {/* Main grid: form + result side by side on desktop */}
         <div className="grid gap-5 lg:grid-cols-2">
-          {/* ── LEFT: Form ─────────────────────────────────────── */}
+          {/* LEFT: Form */}
           <div className="space-y-4">
             {/* Photo upload card */}
             <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
@@ -1552,7 +1557,7 @@ function DiagnosaTanaman() {
             </div>
           </div>
 
-          {/* ── RIGHT: Result + History ─────────────────────────── */}
+          {/* RIGHT: Result + History */}
           <div className="space-y-4">
             {/* Diagnosis result area */}
             {mutation.isPending && <DiagnosisSkeleton />}

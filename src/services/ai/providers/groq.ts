@@ -1,4 +1,4 @@
-// ─── Groq API integration ────────────────────────────────────────────
+// src/services/ai/providers/groq.ts
 export const GROQ_MODEL_TEXT = "qwen/qwen3-32b";
 export const GROQ_MODEL_VISION = "meta-llama/llama-4-scout-17b-16e-instruct";
 
@@ -6,23 +6,19 @@ export interface AIMessage {
   role: "system" | "user" | "assistant";
   content:
     | string
-    | Array<
-        | { type: "text"; text: string }
-        | { type: "image_url"; image_url: { url: string } }
-      >;
+    | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 }
 
 export interface AIResponse {
   content: string;
 }
 
-// ─── Key management ─────────────────────────────────────────────
-
+// Key management dengan support primary + fallback
 function getApiKeys(): string[] {
   const keys: string[] = [];
-  const primary  = import.meta.env.VITE_GROQ_API_KEY;
+  const primary = import.meta.env.VITE_GROQ_API_KEY;
   const fallback = import.meta.env.VITE_GROQ_API_KEY_FB;
-  if (primary)  keys.push(primary);
+  if (primary) keys.push(primary);
   if (fallback) keys.push(fallback);
   return keys;
 }
@@ -31,22 +27,22 @@ async function callGroqWithKey(
   apiKey: string,
   messages: AIMessage[],
   model: string,
+  maxTokens = 1024,
 ): Promise<AIResponse> {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, messages, max_tokens: 2048 }),
+    body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw Object.assign(
-      new Error(`Groq API error ${response.status}: ${errorBody}`),
-      { status: response.status }
-    );
+    throw Object.assign(new Error(`Groq API error ${response.status}: ${errorBody}`), {
+      status: response.status,
+    });
   }
 
   const data = await response.json();
@@ -63,7 +59,8 @@ async function callGroqWithKey(
 export async function callGroq(
   messages: AIMessage[],
   model: string = GROQ_MODEL_TEXT,
-  systemPrompt?: string
+  systemPrompt?: string,
+  maxTokens = 1024,
 ): Promise<AIResponse> {
   const keys = getApiKeys();
 
@@ -81,7 +78,7 @@ export async function callGroq(
     const key = keys[i];
     const label = i === 0 ? "primary" : "fallback";
     try {
-      const result = await callGroqWithKey(key, fullMessages, model);
+      const result = await callGroqWithKey(key, fullMessages, model, maxTokens);
       if (i > 0) console.info(`[Groq] Berhasil via key ${label}`);
       return result;
     } catch (e: any) {
@@ -90,7 +87,6 @@ export async function callGroq(
       const isQuotaExceeded = e?.message?.includes("quota") || e?.message?.includes("rate_limit");
 
       if ((isRateLimit || isQuotaExceeded) && i < keys.length - 1) {
-        // Primary kena limit → coba fallback
         console.warn(`[Groq] Key ${label} rate limited, mencoba key fallback...`);
         continue;
       }

@@ -9,8 +9,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  TrendingUp, TrendingDown, Minus, Search, RefreshCw,
-  MapPin, Clock, ChevronUp, ChevronDown, Info, Wifi, WifiOff,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Search,
+  RefreshCw,
+  MapPin,
+  Clock,
+  ChevronUp,
+  ChevronDown,
+  Info,
+  Wifi,
+  WifiOff,
   AlertCircle,
 } from "lucide-react";
 
@@ -20,16 +30,12 @@ export const Route = createFileRoute("/_authenticated/marketplace")({
 });
 
 const CATEGORIES = [
-  { value: "all",          label: "Semua" },
-  { value: "padi_jagung",  label: "Padi & Palawija" },
+  { value: "all", label: "Semua" },
+  { value: "padi_jagung", label: "Padi & Palawija" },
   { value: "hortikultura", label: "Hortikultura" },
-  { value: "perkebunan",   label: "Perkebunan" },
-  { value: "protein",      label: "Protein & Ternak" },
+  { value: "perkebunan", label: "Perkebunan" },
+  { value: "protein", label: "Protein & Ternak" },
 ];
-
-// ─────────────────────────────────────────────────────────────
-// PRICE CARD
-// ─────────────────────────────────────────────────────────────
 
 function PriceCard({ price }: { price: CommodityPrice }) {
   const [expanded, setExpanded] = useState(false);
@@ -51,9 +57,7 @@ function PriceCard({ price }: { price: CommodityPrice }) {
           <div className="text-right shrink-0">
             <p className="font-bold text-base">
               Rp {price.price.toLocaleString("id-ID")}
-              <span className="text-xs font-normal text-muted-foreground">
-                /{price.unit}
-              </span>
+              <span className="text-xs font-normal text-muted-foreground">/{price.unit}</span>
             </p>
             <div
               className={cn(
@@ -61,8 +65,8 @@ function PriceCard({ price }: { price: CommodityPrice }) {
                 price.trend === "up"
                   ? "text-success"
                   : price.trend === "down"
-                  ? "text-destructive"
-                  : "text-muted-foreground"
+                    ? "text-destructive"
+                    : "text-muted-foreground",
               )}
             >
               <TrendIcon className="h-3 w-3" />
@@ -85,10 +89,8 @@ function PriceCard({ price }: { price: CommodityPrice }) {
                   5,
                   Math.min(
                     95,
-                    ((price.price - price.weekLow) /
-                      (price.weekHigh - price.weekLow || 1)) *
-                      100
-                  )
+                    ((price.price - price.weekLow) / (price.weekHigh - price.weekLow || 1)) * 100,
+                  ),
                 )}%`,
               }}
             />
@@ -119,8 +121,8 @@ function PriceCard({ price }: { price: CommodityPrice }) {
             price.sellRecommendation === "sekarang"
               ? "bg-success/5"
               : price.sellRecommendation === "jual_cepat"
-              ? "bg-destructive/5"
-              : "bg-warning/5"
+                ? "bg-destructive/5"
+                : "bg-warning/5",
           )}
         >
           <div className="flex items-start gap-2">
@@ -130,15 +132,15 @@ function PriceCard({ price }: { price: CommodityPrice }) {
                 price.sellRecommendation === "sekarang"
                   ? "bg-success/20 text-success"
                   : price.sellRecommendation === "jual_cepat"
-                  ? "bg-destructive/20 text-destructive"
-                  : "bg-warning/20 text-warning"
+                    ? "bg-destructive/20 text-destructive"
+                    : "bg-warning/20 text-warning",
               )}
             >
               {price.sellRecommendation === "sekarang"
                 ? "Jual Sekarang"
                 : price.sellRecommendation === "jual_cepat"
-                ? "Jual Cepat!"
-                : "Tunggu Dulu"}
+                  ? "Jual Cepat!"
+                  : "Tunggu Dulu"}
             </span>
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">{price.sellReason}</p>
@@ -151,10 +153,6 @@ function PriceCard({ price }: { price: CommodityPrice }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// ERROR STATE
-// ─────────────────────────────────────────────────────────────
-
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-12 text-center shadow-card">
@@ -163,8 +161,8 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       </div>
       <p className="font-semibold text-base">Data harga tidak tersedia</p>
       <p className="mt-2 text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-        Server harga pasar (Panel Harga Pangan BPN) sedang tidak dapat dijangkau.
-        Data hanya ditampilkan jika berasal dari sumber resmi yang terverifikasi.
+        Server harga pasar (Panel Harga Pangan BPN) sedang tidak dapat dijangkau. Data hanya
+        ditampilkan jika berasal dari sumber resmi yang terverifikasi.
       </p>
       <Button onClick={onRetry} className="mt-5 gap-1.5" size="sm" variant="outline">
         <RefreshCw className="h-3.5 w-3.5" />
@@ -174,35 +172,24 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────────────────────
-
 function HargaPasar() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [region, setRegion] = useState("Nasional");
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-
   const { data: plants = [] } = usePlants();
   const { location } = useWeather();
 
-  // Auto-set region dari lokasi user
   useMemo(() => {
     if (location?.province) {
       const match = MARKET_REGIONS.find((r) =>
-        location.province
-          .toLowerCase()
-          .includes(r.toLowerCase().split(" ").pop() ?? "")
+        location.province.toLowerCase().includes(r.toLowerCase().split(" ").pop() ?? ""),
       );
       if (match && match !== "Nasional") setRegion(match);
     }
   }, [location?.province]);
 
-  const activePlantNames = plants
-    .filter((p) => p.status === "Aktif")
-    .map((p) => p.name);
-
+  const activePlantNames = plants.filter((p) => p.status === "Aktif").map((p) => p.name);
   const {
     filteredPrices,
     myPlantPrices,
@@ -236,7 +223,7 @@ function HargaPasar() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header ─────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Harga Pasar</h1>
@@ -275,7 +262,7 @@ function HargaPasar() {
         </Button>
       </div>
 
-      {/* ── Filter bar ─────────────────────────────────────────── */}
+      {/* Filter bar */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
         <div className="flex flex-wrap gap-3">
           {/* Search */}
@@ -311,7 +298,7 @@ function HargaPasar() {
                 "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
                 category === cat.value
                   ? "bg-primary text-primary-foreground"
-                  : "bg-muted hover:bg-muted/80"
+                  : "bg-muted hover:bg-muted/80",
               )}
             >
               {cat.label}
@@ -320,7 +307,7 @@ function HargaPasar() {
         </div>
       </div>
 
-      {/* ── Loading skeleton ────────────────────────────────────── */}
+      {/* Loading skeleton */}
       {isLoading && (
         <div className="space-y-4">
           <Skeleton className="h-12 w-48 rounded-xl" />
@@ -338,12 +325,12 @@ function HargaPasar() {
         </div>
       )}
 
-      {/* ── Error state ─────────────────────────────────────────── */}
+      {/* Error state */}
       {!isLoading && (isError || (!isRealtime && !isFetching)) && (
         <ErrorState onRetry={handleRefresh} />
       )}
 
-      {/* ── Content — hanya tampil jika data real-time dari BPN ─── */}
+      {/* Content — hanya tampil jika data real-time dari BPN */}
       {!isLoading && !isError && isRealtime && (
         <>
           {/* Summary bar */}
@@ -434,11 +421,9 @@ function HargaPasar() {
           <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
             <Info className="h-4 w-4 shrink-0 mt-0.5" />
             <p>
-              {isRealtime
-                ? `Data real-time dari ${source}. `
-                : `Data referensi — ${source}. `}
-              Harga aktual dapat berbeda di masing-masing daerah dan pasar.
-              Gunakan sebagai referensi perencanaan penjualan.
+              {isRealtime ? `Data real-time dari ${source}. ` : `Data referensi — ${source}. `}
+              Harga aktual dapat berbeda di masing-masing daerah dan pasar. Gunakan sebagai
+              referensi perencanaan penjualan.
               {fromCache && " • Data dari cache lokal."}
             </p>
           </div>

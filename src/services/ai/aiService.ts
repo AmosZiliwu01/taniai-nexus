@@ -1,6 +1,4 @@
 // src/services/ai/aiService.ts
-// Menggunakan Groq sebagai provider utama (menggantikan OpenRouter)
-
 import { callGroq, GROQ_MODEL_TEXT, GROQ_MODEL_VISION, type AIMessage } from "./providers/groq";
 
 export type { AIMessage };
@@ -8,8 +6,8 @@ export type { AIMessage };
 export interface AICallOptions {
   messages: AIMessage[];
   systemPrompt?: string;
-  /** true = pakai model vision (untuk analisis foto tanaman) */
   vision?: boolean;
+  maxTokens?: number;
 }
 
 function isUnrecoverableError(err: Error): boolean {
@@ -29,7 +27,7 @@ export async function callAI(opts: AICallOptions): Promise<string> {
     throw new Error("VITE_GROQ_API_KEY belum diisi di .env.local");
   }
 
-  const result = await callGroq(opts.messages, model, opts.systemPrompt);
+  const result = await callGroq(opts.messages, model, opts.systemPrompt, opts.maxTokens);
   return result.content;
 }
 

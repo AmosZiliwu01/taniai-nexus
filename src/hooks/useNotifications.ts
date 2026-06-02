@@ -11,7 +11,6 @@ export interface Notification {
   created_at: string;
 }
 
-// Helper untuk parse body JSON
 function parseBody(body: string | null): any {
   if (!body) return { raw: null };
   try {
@@ -21,23 +20,15 @@ function parseBody(body: string | null): any {
   }
 }
 
-// Ekstrak POST_ID dari body notifikasi (support JSON dan plain text)
+// Ekstrak post_id dari body (support JSON dan plain text)
 function extractPostId(body: string | null): string | null {
   if (!body) return null;
-  
   const parsed = parseBody(body);
-  
-  // Coba dari JSON
-  if (parsed.post_id) {
-    return parsed.post_id;
-  }
-  
-  // Fallback ke regex untuk plain text
+  if (parsed.post_id) return parsed.post_id;
   const m = body.match(/POST_ID:([a-f0-9-]+)/);
   return m ? m[1] : null;
 }
 
-// Ekstrak comment_id jika ada
 function extractCommentId(body: string | null): string | null {
   if (!body) return null;
   const parsed = parseBody(body);
@@ -51,7 +42,9 @@ export function useNotifications() {
   const query = useQuery({
     queryKey: ["notifications"],
     queryFn: async (): Promise<Notification[]> => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return [];
 
       const [notifRes, prefRes] = await Promise.all([
@@ -61,11 +54,7 @@ export function useNotifications() {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(50),
-        supabase
-          .from("profiles")
-          .select("notification_prefs")
-          .eq("id", user.id)
-          .maybeSingle(),
+        supabase.from("profiles").select("notification_prefs").eq("id", user.id).maybeSingle(),
       ]);
 
       const allNotifs: Notification[] = notifRes.data ?? [];
@@ -74,15 +63,15 @@ export function useNotifications() {
       if (!prefs) return allNotifs;
 
       const typeToKey: Record<string, string> = {
-        community:      "community",
+        community: "community",
         community_like: "community",
-        diagnosis:      "diagnosis",
-        weather:        "weather",
-        ai:             "ai",
-        report:         "_always",
-        warning:        "_always",
-        success:        "_always",
-        info:           "_always",
+        diagnosis: "diagnosis",
+        weather: "weather",
+        ai: "ai",
+        report: "_always",
+        warning: "_always",
+        success: "_always",
+        info: "_always",
       };
 
       return allNotifs.filter((n) => {
@@ -95,6 +84,7 @@ export function useNotifications() {
     refetchInterval: 30 * 1000,
   });
 
+  // Realtime listener untuk notifikasi baru via Supabase channel
   useEffect(() => {
     let cancelled = false;
 
@@ -122,7 +112,7 @@ export function useNotifications() {
           },
           () => {
             qc.invalidateQueries({ queryKey: ["notifications"] });
-          }
+          },
         )
         .subscribe();
 
@@ -136,14 +126,16 @@ export function useNotifications() {
         channelRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const unreadCount = (query.data ?? []).filter((n) => !n.is_read).length;
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       await supabase
         .from("notifications")
@@ -156,7 +148,9 @@ export function useNotifications() {
 
   const markAllRead = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       await supabase
         .from("notifications")
@@ -176,37 +170,29 @@ export function useNotifications() {
   };
 }
 
-// Format body untuk tampilan web
+// Format body notifikasi untuk tampilan di UI
 export function formatNotificationBody(body: string | null): string {
   if (!body) return "";
-  
+
   const parsed = parseBody(body);
-  
-  // Untuk notifikasi warning (postingan dilarang dari admin)
-  if (parsed.message && (parsed.action === 'approved' || parsed.reason)) {
+
+  if (parsed.message && (parsed.action === "approved" || parsed.reason)) {
     return parsed.message;
   }
-  
-  // Untuk notifikasi komentar
   if (parsed.commenter_name && parsed.comment_content) {
     return `${parsed.commenter_name}: "${parsed.comment_content}"`;
   }
-  
-  // Untuk notifikasi laporan ditolak
-  if (parsed.action === 'rejected' && parsed.message) {
+  if (parsed.action === "rejected" && parsed.message) {
     return parsed.message;
   }
-  
-  // Untuk notifikasi dengan raw text
   if (parsed.raw) {
     return parsed.raw.replace(/POST_ID:[a-f0-9-]+\n?/, "").trim();
   }
-  
-  // Fallback: tampilkan body apa adanya
-  return body.length > 100 ? body.substring(0, 100) + '...' : body;
+
+  return body.length > 100 ? body.substring(0, 100) + "..." : body;
 }
 
-// Navigasi berdasarkan tipe notifikasi
+// Tentukan URL navigasi berdasarkan tipe notifikasi
 export function getNotificationLink(notification: Notification): string {
   const type = notification.type;
   const postId = extractPostId(notification.body);
@@ -216,7 +202,9 @@ export function getNotificationLink(notification: Notification): string {
     case "community":
     case "community_like":
       if (postId) {
-        return commentId ? `/community?post=${postId}&comment=${commentId}` : `/community?post=${postId}`;
+        return commentId
+          ? `/community?post=${postId}&comment=${commentId}`
+          : `/community?post=${postId}`;
       }
       return "/community";
     case "warning":
@@ -235,7 +223,6 @@ export function getNotificationLink(notification: Notification): string {
   }
 }
 
-// Get icon untuk notifikasi
 export function getNotificationIcon(type: string | null): string {
   const icons: Record<string, string> = {
     warning: "⚠️",
@@ -250,7 +237,6 @@ export function getNotificationIcon(type: string | null): string {
   return icons[type ?? "info"] ?? "🔔";
 }
 
-// Get warna untuk notifikasi
 export function getNotificationColor(type: string | null): string {
   const colors: Record<string, string> = {
     warning: "text-orange-600 bg-orange-50 border-orange-200",

@@ -1,3 +1,4 @@
+// src/routes/_authenticated/articles.tsx
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,10 +60,7 @@ type Category = { id: string; name: string; slug: string };
 const inputCls =
   "w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-base outline-none placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SHARED CSS — WYSIWYG FLOAT FIX
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Shared CSS untuk konten artikel (editor & tampilan)
 const SHARED_ARTICLE_CSS = `
 .ql-editor,
 .article-content {
@@ -386,10 +384,7 @@ function injectSharedCSS() {
   document.head.appendChild(s);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STORAGE & NORMALIZATION HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
+//Start of ArticlesPage component
 function extractStoragePaths(content: string | null, coverImage: string | null): string[] {
   const paths: string[] = [];
   if (content) {
@@ -504,10 +499,6 @@ function insertFloatClearfixes(container: HTMLElement): void {
     container.appendChild(clearDiv);
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// IMAGE RESIZE MODULE
-// ─────────────────────────────────────────────────────────────────────────────
 
 const SVG = {
   wrapLeft: `<svg width="22" height="18" viewBox="0 0 22 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -864,10 +855,7 @@ class ImageResizeModule {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ARTICLE CONTENT RENDERER
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Artikel konten renderer yang menangani float image dan clearfix otomatis
 function ArticleContentRenderer({ content }: { content: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -955,23 +943,16 @@ function ArticleContentRenderer({ content }: { content: string }) {
   return <div ref={ref} className="article-content" />;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ★ SHARED ARTICLE DISPLAY CARD
-//   Used identically in both ArticleDetail and the form modal live preview.
-//   This is the single source of truth for article rendering.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Shared component for displaying article content in both editor and preview, handling image floats and clearfix automatically
 type ArticleDisplayProps = {
   title: string;
   excerpt?: string | null;
   coverImage?: string | null;
   authorName?: string | null;
   categoryName?: string | null;
-  /** ISO date string or Date object. Pass null to use today's date (preview mode). */
   createdAt?: string | Date | null;
   readMinutes?: number | string | null;
   content?: string | null;
-  /** When true, shows placeholder text instead of empty states */
   isPreview?: boolean;
 };
 
@@ -1093,10 +1074,7 @@ function ArticleDisplayCard({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE CONFIRM MODAL
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Confirmation modal for deleting an article, with destructive styling and pending state handling
 function DeleteConfirmModal({
   title,
   onConfirm,
@@ -1132,10 +1110,7 @@ function DeleteConfirmModal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Main page component for listing, viewing, creating, and managing articles, with admin controls and category filtering
 function ArticlesPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1198,7 +1173,7 @@ function ArticlesPage() {
       if (debouncedSearch)
         q = (q as any).or(`title.ilike.%${debouncedSearch}%,excerpt.ilike.%${debouncedSearch}%`);
       if (selectedCategory !== "all") q = (q as any).eq("category_id", selectedCategory);
-      const { data, error } = await q;
+      const { data, error } = await (q as any);
       if (error) return [];
       return (data ?? []) as Article[];
     },
@@ -1310,8 +1285,9 @@ function ArticlesPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        {/* Search - mengambil sisa space */}
+        <div className="relative flex-1 min-w-0 w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             value={search}
@@ -1328,14 +1304,19 @@ function ArticlesPage() {
             </button>
           )}
         </div>
-        <div className="w-full sm:w-48 shrink-0">
+
+        {/* Category filter - tetap di kanan, full width di mobile */}
+        <div className="flex items-center gap-2 sm:flex-shrink-0">
+          <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
+            Filter:
+          </span>
           <select
             value={selectedCategory}
             onChange={(e) => {
               setSelectedCategory(e.target.value);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-medium outline-none focus:border-primary cursor-pointer"
+            className="flex-1 sm:w-48 rounded-xl border border-input bg-card px-3 py-2 text-sm font-medium outline-none focus:border-primary cursor-pointer"
           >
             <option value="all">Semua Kategori</option>
             {categories.map((c) => (
@@ -1408,10 +1389,7 @@ function ArticlesPage() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ARTICLE CARD (grid thumbnail) with Delete Modal
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Card component for displaying article summary in the grid/list view, with admin controls for editing, deleting, and toggling publish status
 function ArticleCard({
   article,
   isAdmin,
@@ -1565,10 +1543,7 @@ function ArticleCard({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN TABLE with Delete Modal
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Admin table view for managing articles with inline actions for editing, deleting, toggling publish status, and viewing details, along with filtering by publish status
 function AdminArticleTable({
   articles,
   isLoading,
@@ -1737,10 +1712,7 @@ function AdminArticleTable({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ARTICLE DETAIL PAGE — now with interactive related articles & categories
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Article detail view component for displaying full article content along with related articles and category links, with handlers for navigating back, selecting related articles, and filtering by category
 function ArticleDetail({
   article,
   onBack,
@@ -1846,10 +1818,7 @@ function ArticleDetail({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ARTICLE FORM MODAL — single column, lebar sama dengan detail artikel
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Simple label component for form fields, with optional required indicator
 function FieldLabel({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
     <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground mb-1.5">
@@ -1888,7 +1857,7 @@ function ArticleFormModal({
     read_minutes: editItem?.read_minutes?.toString() ?? "",
   });
 
-  // ─── Ukur lebar kolom artikel (jika ada) ─────────────────────────────
+  // Update modal width based on article column width for better responsiveness
   useEffect(() => {
     const articleColumn = document.getElementById("article-main-column");
     if (!articleColumn) {
@@ -1904,7 +1873,7 @@ function ArticleFormModal({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // ─── Inisialisasi Quill Editor ──────────────────────────────────────
+  // Initialize Quill editor with image upload handling, content synchronization, and image layout controls, while ensuring proper cleanup on unmount
   useEffect(() => {
     let mounted = true;
     injectSharedCSS();
@@ -2084,7 +2053,7 @@ function ArticleFormModal({
     };
   }, []);
 
-  // ─── AI Generate ────────────────────────────────────────────────────
+  // Handler untuk generate konten artikel menggunakan AI berdasarkan judul, kutipan, dan kategori yang dipilih, dengan validasi input dan penanganan error yang sesuai
   const handleGenerateContent = async () => {
     if (!form.title.trim()) {
       toast.error("Judul harus diisi dulu");
@@ -2188,7 +2157,7 @@ function ArticleFormModal({
 
   const isBusy = mutation.isPending || uploadingImage || generatingAI;
 
-  // ─── Render Modal dengan lebar dinamis ───────────────────────────────
+  // Modal layout with header, scrollable body for form fields including title, excerpt, rich text editor for content with image upload and AI generation features, and footer with action buttons, all styled for a clean and responsive user experience
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-[930px] rounded-2xl border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]">
@@ -2486,10 +2455,7 @@ function ArticleFormModal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SKELETONS & EMPTY STATE
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Skeleton component for loading state of articles grid, displaying placeholder cards with skeleton elements to indicate content is being loaded
 function ArticlesGridSkeleton() {
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

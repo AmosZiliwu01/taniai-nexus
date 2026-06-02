@@ -1,3 +1,4 @@
+// src/routes/_authenticated.tsx
 import { useEffect, useState, useCallback } from "react";
 import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +8,7 @@ import { Loader2 } from "lucide-react";
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
-    
+
     const { data } = await supabase.auth.getSession();
     if (!data.session) throw redirect({ to: "/login" });
 
@@ -21,9 +22,9 @@ export const Route = createFileRoute("/_authenticated")({
 
     if (blocked) {
       await supabase.auth.signOut();
-      throw redirect({ 
+      throw redirect({
         to: "/login",
-        search: { message: "Akun Anda telah diblokir. Hubungi admin." }
+        search: { message: "Akun Anda telah diblokir. Hubungi admin." },
       });
     }
   },
@@ -42,7 +43,9 @@ function AuthLayout() {
 
   const loadUser = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         navigate({ to: "/login" });
         return;
@@ -64,14 +67,10 @@ function AuthLayout() {
       ]);
 
       const prof =
-        profileRes.status === "fulfilled" && !profileRes.value.error
-          ? profileRes.value.data
-          : null;
+        profileRes.status === "fulfilled" && !profileRes.value.error ? profileRes.value.data : null;
 
       const role =
-        roleRes.status === "fulfilled" && !roleRes.value.error
-          ? roleRes.value.data
-          : null;
+        roleRes.status === "fulfilled" && !roleRes.value.error ? roleRes.value.data : null;
 
       setUser({
         email: session.user.email,

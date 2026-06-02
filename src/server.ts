@@ -1,4 +1,2 @@
-// This file is no longer used in SPA mode - kept for compatibility
-// SSR entry point removed for client-side only build
-
+// src/server.ts
 export const serverEntry = undefined;

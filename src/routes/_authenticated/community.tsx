@@ -1,3 +1,4 @@
+// src/routes/_authenticated/community.tsx
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWeatherSummary, useWeather } from "@/hooks/useWeather";
@@ -335,8 +336,6 @@ function CommentInput({
           p.id === postId ? { ...p, comments_count: commCount ?? 0 } : p,
         );
       });
-
-      // Notif komentar ditangani DB trigger trg_notify_comment
 
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["post-comments", postId] }),
@@ -851,7 +850,6 @@ function TopDiscussionsWidget({ posts }: { posts: Post[] }) {
 // FIX: Tambahkan prop currentUserId agar user yang login selalu muncul
 function ActiveUsersWidget({ currentUserId }: { currentUserId: string }) {
   const { data: activeUsers = [] } = useQuery({
-    // FIX: currentUserId masuk queryKey supaya re-fetch saat user sudah siap
     queryKey: ["community-active-users", currentUserId],
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -873,7 +871,6 @@ function ActiveUsersWidget({ currentUserId }: { currentUserId: string }) {
         scoreMap[r.user_id] = (scoreMap[r.user_id] ?? 0) + 1;
       });
 
-      // FIX: Pastikan current user selalu ada di daftar meski belum punya aktivitas
       if (currentUserId && !scoreMap[currentUserId]) {
         scoreMap[currentUserId] = 0;
       }
@@ -892,8 +889,6 @@ function ActiveUsersWidget({ currentUserId }: { currentUserId: string }) {
         return data ?? [];
       }
 
-      // FIX: Sebelumnya salah pakai `userIds` (tidak terdefinisi di scope ini).
-      // Variabel yang benar adalah `topIds`.
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url")
@@ -955,7 +950,6 @@ function PostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const isOwn = post.user_id === currentUserId;
-  // FIX: full_name sudah diisi dari query — fallback "Petani" hanya jika benar-benar null/kosong
   const authorName = post.author?.full_name?.trim() || "Petani";
   const [reportReason, setReportReason] = useState("");
   const [showReportModal, setShowReportModal] = useState(false);
@@ -1053,7 +1047,6 @@ function PostCard({
         await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
       } else {
         await supabase.from("post_likes").insert({ post_id: post.id, user_id: user.id });
-        // Notif like ditangani DB trigger trg_notify_like
       }
       const { count } = await supabase
         .from("post_likes")
@@ -1132,13 +1125,11 @@ function PostCard({
       const reporterIsAdmin = !!reporterRole;
 
       if (reporterIsAdmin) {
-        // Admin → langsung flag, tidak perlu approve
         await supabase
           .from("community_posts")
           .update({ is_flagged: true, flagged_reason: reason })
           .eq("id", post.id);
 
-        // Kirim notif warning ke pemilik post (jika bukan admin itu sendiri)
         if (post.user_id !== user.id) {
           await supabase.from("notifications").insert({
             user_id: post.user_id,
@@ -1157,7 +1148,6 @@ function PostCard({
           });
         }
 
-        // Simpan laporan sebagai resolved langsung
         await supabase.from("content_reports").insert({
           reporter_id: user.id,
           post_id: post.id,
@@ -1165,7 +1155,6 @@ function PostCard({
           status: "resolved",
         });
       } else {
-        // User biasa → hanya content_reports; notif ke admin ditangani DB trigger
         await supabase.from("content_reports").insert({
           reporter_id: user.id,
           post_id: post.id,
@@ -1404,34 +1393,12 @@ function PostCard({
         </div>
 
         {showComments && (
-          <div className="border-t border-border/60 px-4 pt-3 pb-4 space-y-3 bg-muted/10">
-            {commentsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 2 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 rounded-2xl" />
-                ))}
-              </div>
-            ) : comments.length === 0 ? (
-              <p className="text-center text-xs text-muted-foreground py-2">
-                Belum ada komentar. Jadilah yang pertama!
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {comments.map((c) => (
-                  <CommentItem
-                    key={c.id}
-                    comment={c}
-                    postId={post.id}
-                    currentUserId={currentUserId}
-                    onReply={handleReply}
-                    depth={0}
-                    isExpanded={expandedReplies.has(c.id)}
-                    onToggleExpand={toggleExpand}
-                  />
-                ))}
-              </div>
-            )}
-            <div id={`comment-input-${post.id}`}>
+          <div className="border-t border-border/60 bg-muted/10">
+            {/* Input komentar — selalu di atas */}
+            <div
+              className="px-4 pt-3 pb-2 border-b border-border/40"
+              id={`comment-input-${post.id}`}
+            >
               <CommentInput
                 postId={post.id}
                 replyTarget={replyTarget}
@@ -1443,6 +1410,38 @@ function PostCard({
                 }}
                 currentUser={currentUser}
               />
+            </div>
+            {/* Daftar komentar — scrollable, komentar terbaru di atas */}
+            <div
+              className="overflow-y-auto px-4 pt-3 pb-4 comment-scroll"
+              style={{ maxHeight: "320px" }}
+            >
+              {commentsLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 rounded-2xl" />
+                  ))}
+                </div>
+              ) : comments.length === 0 ? (
+                <p className="text-center text-xs text-muted-foreground py-2">
+                  Belum ada komentar. Jadilah yang pertama!
+                </p>
+              ) : (
+                <div className="flex flex-col-reverse gap-2">
+                  {comments.map((c) => (
+                    <CommentItem
+                      key={c.id}
+                      comment={c}
+                      postId={post.id}
+                      currentUserId={currentUserId}
+                      onReply={handleReply}
+                      depth={0}
+                      isExpanded={expandedReplies.has(c.id)}
+                      onToggleExpand={toggleExpand}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1673,7 +1672,15 @@ function PostCard({
         </div>
       )}
 
-      <style>{`.thin-scroll::-webkit-scrollbar { width: 4px; } .thin-scroll::-webkit-scrollbar-track { background: transparent; } .thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 20px; }`}</style>
+      <style>{`
+        .thin-scroll::-webkit-scrollbar { width: 4px; }
+        .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+        .thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 20px; }
+        .comment-scroll::-webkit-scrollbar { width: 3px; }
+        .comment-scroll::-webkit-scrollbar-track { background: transparent; }
+        .comment-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 20px; }
+        .comment-scroll { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.08) transparent; }
+      `}</style>
     </>
   );
 }
@@ -1759,10 +1766,6 @@ function Community() {
       const postIds = rawPosts.map((p) => p.id);
       const authorIds = [...new Set(rawPosts.map((p) => p.user_id))];
 
-      // Sebelumnya query ini return kosong untuk user biasa karena RLS `profiles`
-      // hanya allow SELECT untuk diri sendiri atau admin.
-      // Solusi: tambahkan RLS policy publik di Supabase:
-      //   CREATE POLICY "profiles_public_read_community" ON profiles FOR SELECT USING (true);
       const { data: profileRows } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url")
@@ -1790,7 +1793,6 @@ function Community() {
         commentsCountMap[r.post_id] = (commentsCountMap[r.post_id] ?? 0) + 1;
       });
 
-      // RLS post_likes perlu allow SELECT untuk row milik sendiri (auth.uid() = user_id).
       let likedIds = new Set<string>();
       if (user) {
         const { data: myLikes } = await supabase
@@ -1803,7 +1805,6 @@ function Community() {
 
       return rawPosts.map((p) => ({
         ...p,
-        // Override dengan nilai fresh dari tabel sumber
         likes_count: likesCountMap[p.id] ?? p.likes_count ?? 0,
         comments_count: commentsCountMap[p.id] ?? p.comments_count ?? 0,
         author: profileMap[p.user_id] ?? { full_name: null, avatar_url: null },

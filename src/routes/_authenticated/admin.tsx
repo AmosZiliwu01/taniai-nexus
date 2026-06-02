@@ -1,3 +1,4 @@
+//src/routes/_authenticated/admin.tsx
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 type AdminTab = "dashboard" | "users" | "moderation" | "reports" | "diagnoses";
 
-// ─── Helpers ─────────────────────────────────────────────────
+// Hapus tag HTML dari string konten postingan
 function stripHtml(html: string): string {
   if (!html) return "";
   return html
@@ -48,6 +49,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// Kirim notifikasi in-app ke user tertentu
 async function pushNotification(
   userId: string,
   opts: { title: string; body?: string; type?: string },
@@ -60,7 +62,7 @@ async function pushNotification(
   });
 }
 
-// ─── SweetAlert2 helpers ─────────────────────────────────────
+// SweetAlert2 mixin: konfirmasi aksi normal
 const Swal2 = Swal.mixin({
   confirmButtonColor: "#16a34a",
   cancelButtonColor: "#6b7280",
@@ -72,6 +74,7 @@ const Swal2 = Swal.mixin({
   },
 });
 
+// SweetAlert2 mixin: aksi destruktif (hapus permanen)
 const SwalDanger = Swal.mixin({
   confirmButtonColor: "#dc2626",
   cancelButtonColor: "#6b7280",
@@ -83,6 +86,7 @@ const SwalDanger = Swal.mixin({
   },
 });
 
+// SweetAlert2 mixin: aksi peringatan (blokir, tandai)
 const SwalWarning = Swal.mixin({
   confirmButtonColor: "#d97706",
   cancelButtonColor: "#6b7280",
@@ -94,7 +98,7 @@ const SwalWarning = Swal.mixin({
   },
 });
 
-// ─── StatCard ────────────────────────────────────────────────
+// Kartu statistik dashboard
 function StatCard({ icon: Icon, label, value, color = "bg-primary/10 text-primary" }: any) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
@@ -109,7 +113,7 @@ function StatCard({ icon: Icon, label, value, color = "bg-primary/10 text-primar
   );
 }
 
-// ─── Main Admin ──────────────────────────────────────────────
+// Halaman utama Admin Panel
 function Admin() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -182,7 +186,7 @@ function Admin() {
     enabled: adminVerified === true && activeTab === "users",
   });
 
-  // ── Posts (with author name) ───────────────────────────────
+  // Ambil postingan beserta nama author
   const { data: posts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["admin-posts", moderationFilter],
     queryFn: async () => {
@@ -213,7 +217,7 @@ function Admin() {
     enabled: adminVerified === true && activeTab === "moderation",
   });
 
-  // ── Reports (with author names) ────────────────────────────
+  // Ambil laporan beserta nama pelapor dan pemilik postingan
   const { data: reports = [], isLoading: reportsLoading } = useQuery({
     queryKey: ["admin-reports"],
     queryFn: async () => {
@@ -349,7 +353,6 @@ function Admin() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  // Jika pelapor adalah admin, flagPost sudah mengirim notifikasi — skip agar tidak double
   const approveReport = useMutation({
     mutationFn: async (report: any) => {
       const {
@@ -377,7 +380,6 @@ function Admin() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      // Update status laporan
       await supabase
         .from("content_reports")
         .update({
@@ -387,8 +389,6 @@ function Admin() {
         })
         .eq("id", report.id);
 
-      // Kirim notifikasi ke PELAPOR bahwa laporan ditolak
-      // PERBAIKAN: Gunakan JSON.stringify, bukan ::text
       const notificationBody = JSON.stringify({
         reason: report.reason,
         post_id: report.post_id,
@@ -683,7 +683,7 @@ function Admin() {
         ))}
       </div>
 
-      {/* ── Dashboard ─────────────────────────────────── */}
+      {/* Dashboard */}
       {activeTab === "dashboard" && (
         <div className="space-y-6">
           {statsLoading ? (
@@ -769,7 +769,7 @@ function Admin() {
         </div>
       )}
 
-      {/* ── Users ─────────────────────────────────────── */}
+      {/* Users */}
       {activeTab === "users" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -917,7 +917,7 @@ function Admin() {
         </div>
       )}
 
-      {/* ── Moderation ────────────────────────────────── */}
+      {/* Moderation */}
       {activeTab === "moderation" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -983,7 +983,6 @@ function Admin() {
                   <div className="p-4">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
-                        {/* Author + meta */}
                         <div className="flex items-center gap-2 mb-2">
                           {post.author_avatar ? (
                             <img
@@ -1021,22 +1020,18 @@ function Admin() {
                           )}
                         </div>
 
-                        {/* Title */}
                         <p className="font-semibold text-sm mb-1">{post.title}</p>
 
-                        {/* Flagged reason */}
                         {post.is_flagged && post.flagged_reason && (
                           <p className="text-xs text-amber-700 mb-1.5">
                             📋 Alasan tanda: <strong>{post.flagged_reason}</strong>
                           </p>
                         )}
 
-                        {/* Content preview — plain text, no expand */}
                         <p className="text-sm text-muted-foreground line-clamp-2">
                           {stripHtml(post.content)}
                         </p>
 
-                        {/* Image thumb */}
                         {post.image_url && (
                           <img
                             src={post.image_url}
@@ -1048,7 +1043,6 @@ function Admin() {
                           />
                         )}
 
-                        {/* Link ke postingan asli */}
                         <Link
                           to="/community"
                           search={{ post: post.id }}
@@ -1058,7 +1052,6 @@ function Admin() {
                         </Link>
                       </div>
 
-                      {/* Actions */}
                       <div className="flex flex-col gap-1.5 shrink-0">
                         {post.is_flagged ? (
                           <Button
@@ -1097,7 +1090,7 @@ function Admin() {
         </div>
       )}
 
-      {/* ── Reports ───────────────────────────────────── */}
+      {/* Reports */}
       {activeTab === "reports" && (
         <div className="space-y-4">
           <div className="rounded-xl bg-muted/30 border border-border px-4 py-3 text-xs text-muted-foreground space-y-1">
@@ -1239,7 +1232,7 @@ function Admin() {
         </div>
       )}
 
-      {/* ── Diagnoses ─────────────────────────────────── */}
+      {/* Diagnoses */}
       {activeTab === "diagnoses" && (
         <div className="space-y-3">
           {selectedDiagIds.size > 0 && (

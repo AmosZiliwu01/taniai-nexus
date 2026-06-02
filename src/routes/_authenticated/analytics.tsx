@@ -3,11 +3,30 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlants } from "@/hooks/useUserPlants";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Leaf, MessageCircle, Sprout, AlertTriangle, Calendar, Plus } from "lucide-react";
+import {
+  BarChart3,
+  Leaf,
+  MessageCircle,
+  Sprout,
+  AlertTriangle,
+  Calendar,
+  Plus,
+} from "lucide-react";
 import { format, parseISO, subDays, eachDayOfInterval } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -19,8 +38,18 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 
 const COLORS = ["#16a34a", "#f59e0b", "#ef4444", "#3b82f6", "#8b5cf6", "#ec4899"];
 
-function StatCard({ icon: Icon, label, value, sub, tone = "default" }: {
-  icon: typeof Leaf; label: string; value: string | number; sub: string; tone?: string;
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  tone = "default",
+}: {
+  icon: typeof Leaf;
+  label: string;
+  value: string | number;
+  sub: string;
+  tone?: string;
 }) {
   const tones: Record<string, string> = {
     default: "bg-muted text-muted-foreground",
@@ -32,7 +61,12 @@ function StatCard({ icon: Icon, label, value, sub, tone = "default" }: {
     <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl", tones[tone] ?? tones.default)}>
+        <div
+          className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-xl",
+            tones[tone] ?? tones.default,
+          )}
+        >
           <Icon className="h-4 w-4" />
         </div>
       </div>
@@ -48,7 +82,9 @@ function Analytics() {
   const { data: diagnoses = [], isLoading: diagLoading } = useQuery({
     queryKey: ["analytics-diagnoses"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return [];
       const { data } = await supabase
         .from("plant_diagnoses")
@@ -62,7 +98,9 @@ function Analytics() {
   const { data: aiChats = [] } = useQuery({
     queryKey: ["analytics-ai-chats"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return [];
       const { data } = await supabase
         .from("ai_conversations")
@@ -74,23 +112,23 @@ function Analytics() {
 
   const isLoading = plantsLoading || diagLoading;
 
-  // Filter diagnosis yang valid: is_plant_image = true, severity bukan "Tidak Diketahui", dan bukan diagnosis sampah
-  const validDiagnoses = diagnoses.filter(d => 
-    d.is_plant_image === true && 
-    d.severity !== "Tidak Diketahui" &&
-    d.diagnosis !== "Tidak pasti" &&
-    d.diagnosis !== "Analisis Tidak Dapat Diproses" &&
-    d.diagnosis !== "Gambar bukan tanaman" &&
-    d.diagnosis !== "Analisis Tidak Pasti"
+  // Hanya diagnosa yang valid untuk statistik utama
+  const validDiagnoses = diagnoses.filter(
+    (d) =>
+      d.is_plant_image === true &&
+      d.severity !== "Tidak Diketahui" &&
+      d.diagnosis !== "Tidak pasti" &&
+      d.diagnosis !== "Analisis Tidak Dapat Diproses" &&
+      d.diagnosis !== "Gambar bukan tanaman" &&
+      d.diagnosis !== "Analisis Tidak Pasti",
   );
 
   const totalDiagnoses = diagnoses.length;
   const activePlants = plants.filter((p) => p.status === "Aktif");
   const heavyDiag = validDiagnoses.filter((d) => d.severity === "Berat").length;
   const healthyCount = validDiagnoses.filter((d) => d.severity === "Ringan").length;
-  const healthyRate = validDiagnoses.length > 0
-    ? Math.round((healthyCount / validDiagnoses.length) * 100)
-    : 0;
+  const healthyRate =
+    validDiagnoses.length > 0 ? Math.round((healthyCount / validDiagnoses.length) * 100) : 0;
 
   const hasData = plants.length > 0 || totalDiagnoses > 0;
 
@@ -113,10 +151,14 @@ function Analytics() {
           </div>
           <div className="flex gap-3">
             <Button asChild className="gap-2">
-              <Link to="/plants"><Plus className="h-4 w-4" /> Tambah Tanaman</Link>
+              <Link to="/plants">
+                <Plus className="h-4 w-4" /> Tambah Tanaman
+              </Link>
             </Button>
             <Button asChild variant="outline">
-              <Link to="/plant-doctor"><Leaf className="h-4 w-4" /> Diagnosa Sekarang</Link>
+              <Link to="/plant-doctor">
+                <Leaf className="h-4 w-4" /> Diagnosa Sekarang
+              </Link>
             </Button>
           </div>
         </div>
@@ -124,15 +166,17 @@ function Analytics() {
     );
   }
 
-  // Diagnoses per day (last 14 days) — tetap semua diagnosa
+  // Diagnoses over time — hanya validDiagnoses
   const last14Days = eachDayOfInterval({ start: subDays(new Date(), 13), end: new Date() });
   const diagByDay = last14Days.map((day) => {
     const label = format(day, "d/M");
-    const count = diagnoses.filter((d) => format(parseISO(d.created_at), "yyyy-MM-dd") === format(day, "yyyy-MM-dd")).length;
+    const count = diagnoses.filter(
+      (d) => format(parseISO(d.created_at), "yyyy-MM-dd") === format(day, "yyyy-MM-dd"),
+    ).length;
     return { label, count };
   });
 
-  // Diseases frequency — HANYA validDiagnoses
+  // Disease frequency — hanya validDiagnoses
   const diseaseMap: Record<string, number> = {};
   validDiagnoses.forEach((d) => {
     const key = d.diagnosis || "Unknown";
@@ -145,7 +189,9 @@ function Analytics() {
 
   // Severity distribution — hanya validDiagnoses
   const sevMap: Record<string, number> = { Ringan: 0, Sedang: 0, Berat: 0 };
-  validDiagnoses.forEach((d) => { if (d.severity && sevMap[d.severity] !== undefined) sevMap[d.severity]++; });
+  validDiagnoses.forEach((d) => {
+    if (d.severity && sevMap[d.severity] !== undefined) sevMap[d.severity]++;
+  });
   const sevData = Object.entries(sevMap).map(([name, value]) => ({ name, value }));
 
   return (
@@ -158,19 +204,45 @@ function Analytics() {
       {/* Stat cards */}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1,2,3,4].map((i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={Sprout} label="Tanaman Aktif" value={activePlants.length}
-            sub={activePlants.slice(0, 2).map((p) => p.name).join(", ") || "Tidak ada"} tone="success" />
-          <StatCard icon={Leaf} label="Total Diagnosa" value={totalDiagnoses}
-            sub={`${heavyDiag} kasus berat`} tone={heavyDiag > 0 ? "warning" : "info"} />
-          <StatCard icon={MessageCircle} label="AI Conversations" value={aiChats.length}
-            sub="Total sesi tanya AI" tone="info" />
-          <StatCard icon={AlertTriangle} label="Tingkat Sehat" value={`${healthyRate}%`}
+          <StatCard
+            icon={Sprout}
+            label="Tanaman Aktif"
+            value={activePlants.length}
+            sub={
+              activePlants
+                .slice(0, 2)
+                .map((p) => p.name)
+                .join(", ") || "Tidak ada"
+            }
+            tone="success"
+          />
+          <StatCard
+            icon={Leaf}
+            label="Total Diagnosa"
+            value={totalDiagnoses}
+            sub={`${heavyDiag} kasus berat`}
+            tone={heavyDiag > 0 ? "warning" : "info"}
+          />
+          <StatCard
+            icon={MessageCircle}
+            label="AI Conversations"
+            value={aiChats.length}
+            sub="Total sesi tanya AI"
+            tone="info"
+          />
+          <StatCard
+            icon={AlertTriangle}
+            label="Tingkat Sehat"
+            value={`${healthyRate}%`}
             sub={`${healthyCount} diagnosa ringan`}
-            tone={healthyRate > 60 ? "success" : "warning"} />
+            tone={healthyRate > 60 ? "success" : "warning"}
+          />
         </div>
       )}
 
@@ -192,7 +264,11 @@ function Analytics() {
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                 <Tooltip
-                  contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", fontSize: "12px" }}
+                  contentStyle={{
+                    borderRadius: "12px",
+                    border: "1px solid hsl(var(--border))",
+                    fontSize: "12px",
+                  }}
                   formatter={(v) => [v, "Diagnosa"]}
                 />
                 <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -213,11 +289,19 @@ function Analytics() {
           ) : (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={diseaseData} layout="vertical" barSize={14}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                  horizontal={false}
+                />
                 <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={100} />
                 <Tooltip
-                  contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", fontSize: "12px" }}
+                  contentStyle={{
+                    borderRadius: "12px",
+                    border: "1px solid hsl(var(--border))",
+                    fontSize: "12px",
+                  }}
                   formatter={(v) => [v, "Kasus"]}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
@@ -243,9 +327,16 @@ function Analytics() {
             <div className="flex items-center gap-4">
               <ResponsiveContainer width="50%" height={160}>
                 <PieChart>
-                  <Pie data={sevData} cx="50%" cy="50%" outerRadius={65} dataKey="value" label={false}>
+                  <Pie
+                    data={sevData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={65}
+                    dataKey="value"
+                    label={false}
+                  >
                     {sevData.map((entry) => {
-                      let color = "#16a34a"; // Ringan hijau
+                      let color = "#16a34a";
                       if (entry.name === "Sedang") color = "#f59e0b";
                       if (entry.name === "Berat") color = "#ef4444";
                       return <Cell key={entry.name} fill={color} />;
@@ -261,7 +352,10 @@ function Analytics() {
                   if (s.name === "Berat") color = "#ef4444";
                   return (
                     <div key={s.name} className="flex items-center gap-2 text-sm">
-                      <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <div
+                        className="h-3 w-3 rounded-full shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
                       <span className="flex-1">{s.name}</span>
                       <span className="font-bold">{s.value}</span>
                     </div>
@@ -275,9 +369,13 @@ function Analytics() {
         {/* Plants list */}
         <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
           <h2 className="font-semibold mb-4 flex items-center justify-between">
-            <span className="flex items-center gap-2"><Sprout className="h-4 w-4 text-primary" /> Tanaman Terdaftar</span>
+            <span className="flex items-center gap-2">
+              <Sprout className="h-4 w-4 text-primary" /> Tanaman Terdaftar
+            </span>
             <Button asChild size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs">
-              <Link to="/plants"><Plus className="h-3 w-3" /> Tambah</Link>
+              <Link to="/plants">
+                <Plus className="h-3 w-3" /> Tambah
+              </Link>
             </Button>
           </h2>
           {plants.length === 0 ? (
@@ -288,20 +386,35 @@ function Analytics() {
           ) : (
             <div className="space-y-2.5">
               {plants.slice(0, 6).map((p) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2.5"
+                >
                   <div className="text-xl shrink-0">
-                    {p.name.toLowerCase().includes("padi") ? "🌾" : p.name.toLowerCase().includes("cabai") ? "🌶️" : p.name.toLowerCase().includes("tomat") ? "🍅" : "🌱"}
+                    {p.name.toLowerCase().includes("padi")
+                      ? "🌾"
+                      : p.name.toLowerCase().includes("cabai")
+                        ? "🌶️"
+                        : p.name.toLowerCase().includes("tomat")
+                          ? "🍅"
+                          : "🌱"}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.age_days} HST · {p.soil_condition}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {p.age_days} HST · {p.soil_condition}
+                    </p>
                   </div>
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                    p.status === "Aktif" ? "bg-success/10 text-success"
-                      : p.status === "Panen" ? "bg-blue-100 text-blue-700"
-                      : "bg-muted text-muted-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      p.status === "Aktif"
+                        ? "bg-success/10 text-success"
+                        : p.status === "Panen"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-muted text-muted-foreground",
+                    )}
+                  >
                     {p.status}
                   </span>
                 </div>
@@ -333,7 +446,11 @@ function Analytics() {
               return (
                 <div key={d.id} className="flex items-center gap-3 px-5 py-3">
                   {d.image_url ? (
-                    <img src={d.image_url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                    <img
+                      src={d.image_url}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                    />
                   ) : (
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                       <Leaf className="h-4 w-4 text-primary" />
@@ -349,7 +466,8 @@ function Analytics() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {d.plant_type} · {format(parseISO(d.created_at), "d MMM yyyy", { locale: idLocale })}
+                      {d.plant_type} ·{" "}
+                      {format(parseISO(d.created_at), "d MMM yyyy", { locale: idLocale })}
                       {d.location && ` · 📍 ${d.location}`}
                     </p>
                   </div>
@@ -357,13 +475,20 @@ function Analytics() {
                     {d.confidence_score && (
                       <span className="text-xs text-muted-foreground">{d.confidence_score}%</span>
                     )}
-                    <span className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                      d.severity === "Berat" ? "bg-destructive/10 text-destructive"
-                        : d.severity === "Sedang" ? "bg-warning/10 text-warning"
-                        : d.severity === "Ringan" ? "bg-success/10 text-success"
-                        : "bg-muted text-muted-foreground"
-                    )}>{d.severity ?? "—"}</span>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        d.severity === "Berat"
+                          ? "bg-destructive/10 text-destructive"
+                          : d.severity === "Sedang"
+                            ? "bg-warning/10 text-warning"
+                            : d.severity === "Ringan"
+                              ? "bg-success/10 text-success"
+                              : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {d.severity ?? "—"}
+                    </span>
                   </div>
                 </div>
               );

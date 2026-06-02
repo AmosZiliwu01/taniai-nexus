@@ -1,14 +1,10 @@
 // src/routes/_authenticated/weather.tsx
-
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWeather } from "@/hooks/useWeather";
 import { usePlants } from "@/hooks/useUserPlants";
 import { conditionToLucideIcon } from "@/services/weather/weatherService";
-import {
-  reverseGeocode,
-  type UserLocation,
-} from "@/services/location/locationService";
+import { reverseGeocode, type UserLocation } from "@/services/location/locationService";
 import { getDiseaseWarnings } from "@/lib/ai.functions";
 import { useQuery } from "@tanstack/react-query";
 
@@ -48,10 +44,6 @@ export const Route = createFileRoute("/_authenticated/weather")({
   component: WeatherPage,
 });
 
-// ─────────────────────────────────────────────────────────────
-// ICON MAP
-// ─────────────────────────────────────────────────────────────
-
 const ICON_MAP: Record<string, typeof Sun> = {
   "cloud-lightning": CloudLightning,
   "cloud-rain": CloudRain,
@@ -62,21 +54,11 @@ const ICON_MAP: Record<string, typeof Sun> = {
   sun: Sun,
 };
 
-function WIcon({
-  condition,
-  className,
-}: {
-  condition: string;
-  className?: string;
-}) {
+function WIcon({ condition, className }: { condition: string; className?: string }) {
   const name = conditionToLucideIcon(condition);
   const Icon = ICON_MAP[name] ?? Sun;
   return <Icon className={className} />;
 }
-
-// ─────────────────────────────────────────────────────────────
-// LEAFLET CSS
-// ─────────────────────────────────────────────────────────────
 
 let leafletCssInjected = false;
 
@@ -126,20 +108,12 @@ function ensureLeafletCss() {
   document.head.appendChild(style);
 }
 
-// ─────────────────────────────────────────────────────────────
-// SUGGESTION ITEM TYPE
-// ─────────────────────────────────────────────────────────────
-
 interface SuggestionItem {
   name: string;
   province: string;
   lat: number;
   lon: number;
 }
-
-// ─────────────────────────────────────────────────────────────
-// MAP MODAL
-// ─────────────────────────────────────────────────────────────
 
 interface MapModalProps {
   initialLat: number;
@@ -148,12 +122,7 @@ interface MapModalProps {
   onClose: () => void;
 }
 
-function MapModal({
-  initialLat,
-  initialLon,
-  onConfirm,
-  onClose,
-}: MapModalProps) {
+function MapModal({ initialLat, initialLon, onConfirm, onClose }: MapModalProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
@@ -168,17 +137,12 @@ function MapModal({
   const [searchLoading, setSearchLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [noResults, setNoResults] = useState(false);
-  const [selectedName, setSelectedName] = useState(
-    "Pilih lokasi di peta atau cari kota"
-  );
+  const [selectedName, setSelectedName] = useState("Pilih lokasi di peta atau cari kota");
 
-  // ── click outside closes dropdown ────────────────────────
+  // click outside closes dropdown
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowDropdown(false);
       }
     };
@@ -186,16 +150,16 @@ function MapModal({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── search location ───────────────────────────────────────
+  // search location
   const searchLocation = useCallback(async (value: string) => {
     setSearchLoading(true);
     setNoResults(false);
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          value
+          value,
         )}&countrycodes=id&addressdetails=1&namedetails=1&limit=10&accept-language=id&dedupe=1`,
-        { headers: { Accept: "application/json" } }
+        { headers: { Accept: "application/json" } },
       );
       const data = await res.json();
       const query = value.toLowerCase().trim();
@@ -207,8 +171,7 @@ function MapModal({
         const namedetails = item.namedetails ?? {};
 
         // Nama lokal dari namedetails jika tersedia
-        const localName: string | null =
-          namedetails["name:id"] || namedetails["name"] || null;
+        const localName: string | null = namedetails["name:id"] || namedetails["name"] || null;
 
         // Nama paling spesifik dari address fields
         // Jalan/road ditaruh paling atas agar ketik nama jalan langsung ketemu
@@ -274,7 +237,7 @@ function MapModal({
     }
   }, []);
 
-  // ── debounce search ───────────────────────────────────────
+  // debounce search
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (search.trim().length >= 2) {
@@ -288,73 +251,67 @@ function MapModal({
     return () => clearTimeout(timeout);
   }, [search, searchLocation]);
 
-  // ── move marker ───────────────────────────────────────────
-  const moveMarker = useCallback(
-    async (lat: number, lon: number, knownName?: string) => {
-      if (!markerRef.current) return;
-      markerRef.current.setLatLng([lat, lon]);
+  // move marker
+  const moveMarker = useCallback(async (lat: number, lon: number, knownName?: string) => {
+    if (!markerRef.current) return;
+    markerRef.current.setLatLng([lat, lon]);
 
-      if (knownName) {
-        setSelectedName(knownName);
-        selectedLocRef.current = {
-          lat,
-          lon,
-          city: knownName.split(",")[0].trim(),
-          province: knownName.split(",")[1]?.trim() ?? "",
-          displayName: knownName,
-        };
-        return;
-      }
+    if (knownName) {
+      setSelectedName(knownName);
+      selectedLocRef.current = {
+        lat,
+        lon,
+        city: knownName.split(",")[0].trim(),
+        province: knownName.split(",")[1]?.trim() ?? "",
+        displayName: knownName,
+      };
+      return;
+    }
 
-      setIsGeocoding(true);
-      try {
-        const loc = await reverseGeocode(lat, lon);
-        const name =
-          loc?.displayName ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-        setSelectedName(name);
-        selectedLocRef.current = loc ?? {
-          lat,
-          lon,
-          city: name,
-          province: "",
-          displayName: name,
-        };
-      } catch {
-        const fallback = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-        setSelectedName(fallback);
-        selectedLocRef.current = {
-          lat,
-          lon,
-          city: fallback,
-          province: "",
-          displayName: fallback,
-        };
-      } finally {
-        setIsGeocoding(false);
-      }
-    },
-    []
-  );
+    setIsGeocoding(true);
+    try {
+      const loc = await reverseGeocode(lat, lon);
+      const name = loc?.displayName ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      setSelectedName(name);
+      selectedLocRef.current = loc ?? {
+        lat,
+        lon,
+        city: name,
+        province: "",
+        displayName: name,
+      };
+    } catch {
+      const fallback = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      setSelectedName(fallback);
+      selectedLocRef.current = {
+        lat,
+        lon,
+        city: fallback,
+        province: "",
+        displayName: fallback,
+      };
+    } finally {
+      setIsGeocoding(false);
+    }
+  }, []);
 
-  // ── fly to city ───────────────────────────────────────────
+  // fly to city
   const flyToCity = useCallback(
     (city: SuggestionItem) => {
       if (mapRef.current) {
         mapRef.current.flyTo([city.lat, city.lon], 13, { duration: 1.2 });
       }
-      const name = city.province
-        ? `${city.name}, ${city.province}`
-        : city.name;
+      const name = city.province ? `${city.name}, ${city.province}` : city.name;
       moveMarker(city.lat, city.lon, name);
       setSearch("");
       setSuggestions([]);
       setShowDropdown(false);
       setNoResults(false);
     },
-    [moveMarker]
+    [moveMarker],
   );
 
-  // ── init leaflet ──────────────────────────────────────────
+  // init leaflet
   useEffect(() => {
     ensureLeafletCss();
     let cancelled = false;
@@ -384,10 +341,9 @@ function MapModal({
           attributionControl: false,
         });
 
-        L.tileLayer(
-          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          { maxZoom: 19 }
-        ).addTo(map);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(
+          map,
+        );
 
         const customIcon = L.divIcon({
           className: "",
@@ -432,7 +388,7 @@ function MapModal({
     };
   }, [initialLat, initialLon, moveMarker]);
 
-  // ── confirm ───────────────────────────────────────────────
+  // confirm
   const handleConfirm = () => {
     if (!selectedLocRef.current) return;
     setIsConfirming(true);
@@ -452,14 +408,9 @@ function MapModal({
           </div>
           <div className="flex-1">
             <h2 className="text-sm font-semibold">Pilih Lokasi</h2>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Klik map atau cari kota
-            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Klik map atau cari kota</p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1.5 hover:bg-muted"
-          >
+          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -524,13 +475,9 @@ function MapModal({
                   >
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
-                      <p className="truncate font-medium leading-snug">
-                        {city.name}
-                      </p>
+                      <p className="truncate font-medium leading-snug">{city.name}</p>
                       {city.province && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          {city.province}
-                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{city.province}</p>
                       )}
                     </div>
                   </button>
@@ -559,9 +506,7 @@ function MapModal({
                 Lokasi dipilih
               </p>
               <div className="mt-1 flex items-center gap-1.5">
-                {isGeocoding && (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                )}
+                {isGeocoding && <Loader2 className="h-3 w-3 animate-spin" />}
                 <p className="truncate text-sm font-medium">{selectedName}</p>
               </div>
             </div>
@@ -572,11 +517,7 @@ function MapModal({
               <Button
                 size="sm"
                 onClick={handleConfirm}
-                disabled={
-                  isConfirming ||
-                  isGeocoding ||
-                  selectedName.startsWith("Pilih")
-                }
+                disabled={isConfirming || isGeocoding || selectedName.startsWith("Pilih")}
                 className="gap-1.5"
               >
                 {isConfirming ? (
@@ -594,10 +535,6 @@ function MapModal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// WEATHER PAGE
-// ─────────────────────────────────────────────────────────────
-
 function WeatherPage() {
   const {
     weather,
@@ -610,16 +547,11 @@ function WeatherPage() {
   } = useWeather();
 
   const { data: plants = [] } = usePlants();
-
   const [showMapModal, setShowMapModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data: diseaseWarnings } = useQuery({
-    queryKey: [
-      "disease-warnings",
-      weather?.current.humidity,
-      plants.map((p) => p.name).join(","),
-    ],
+    queryKey: ["disease-warnings", weather?.current.humidity, plants.map((p) => p.name).join(",")],
     queryFn: async () => {
       if (!weather || plants.length === 0) {
         return { warnings: [] };
@@ -654,7 +586,7 @@ function WeatherPage() {
       setLocationByCoords(loc);
       setShowMapModal(false);
     },
-    [setLocationByCoords]
+    [setLocationByCoords],
   );
 
   const lastUpdatedLabel = lastUpdated
@@ -676,9 +608,7 @@ function WeatherPage() {
         {/* HEADER */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Cuaca & Peringatan
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight">Cuaca & Peringatan</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5" />
@@ -715,9 +645,7 @@ function WeatherPage() {
               disabled={isRefreshing}
               className="gap-1.5"
             >
-              <RefreshCw
-                className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")}
-              />
+              <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
               {isRefreshing ? "Memperbarui..." : "Perbarui"}
             </Button>
           </div>
@@ -754,9 +682,7 @@ function WeatherPage() {
                         {weather.current.temp}°
                       </span>
                       <div className="mb-2">
-                        <p className="text-xl font-semibold">
-                          {weather.current.condition}
-                        </p>
+                        <p className="text-xl font-semibold">{weather.current.condition}</p>
                         <p className="text-sm capitalize text-white/70">
                           {weather.current.description}
                         </p>
@@ -822,17 +748,14 @@ function WeatherPage() {
                       className={cn(
                         "flex min-w-[75px] flex-shrink-0 flex-col items-center py-3 text-center text-xs sm:min-w-0",
                         i < 5 && "border-r border-white/10",
-                        i === 0 && "bg-white/10"
+                        i === 0 && "bg-white/10",
                       )}
                     >
                       <p className="text-[11px] font-medium text-white/70">
                         {i === 0 ? "Hari ini" : day?.dayName?.slice(0, 3)}
                       </p>
                       {day ? (
-                        <WIcon
-                          condition={day.condition}
-                          className="my-2 h-5 w-5 text-white/80"
-                        />
+                        <WIcon condition={day.condition} className="my-2 h-5 w-5 text-white/80" />
                       ) : (
                         <div className="my-2 h-5 w-5 rounded-full bg-white/20" />
                       )}
@@ -861,9 +784,7 @@ function WeatherPage() {
                       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-500" />
                       <div>
                         <p className="text-sm font-semibold">{alert.title}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {alert.message}
-                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">{alert.message}</p>
                       </div>
                     </div>
                   </div>
@@ -878,9 +799,7 @@ function WeatherPage() {
           <div className="rounded-2xl border bg-card p-12 text-center shadow-sm">
             <AlertTriangle className="mx-auto h-12 w-12 text-muted-foreground/30" />
             <p className="mt-4 font-semibold">Tidak dapat memuat cuaca</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pastikan API cuaca sudah benar
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Pastikan API cuaca sudah benar</p>
             <Button className="mt-4 gap-1.5" onClick={handleRefresh}>
               <RefreshCw className="h-3.5 w-3.5" />
               Coba Lagi

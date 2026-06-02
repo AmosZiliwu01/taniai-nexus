@@ -1,3 +1,4 @@
+// src/routes/register.tsx
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
@@ -28,7 +29,10 @@ function RegisterPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
-    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signUp({
       email: parsed.data.email,
@@ -39,7 +43,10 @@ function RegisterPage() {
       },
     });
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Akun dibuat! Silakan masuk.");
     navigate({ to: "/dashboard" });
   };
@@ -50,27 +57,58 @@ function RegisterPage() {
         <Logo className="[&_span]:text-primary-foreground" />
         <div className="text-primary-foreground">
           <h2 className="text-4xl font-bold leading-tight">Gabung komunitas petani modern.</h2>
-          <p className="mt-4 text-primary-foreground/80">Gratis selamanya untuk fitur dasar. Mulai diagnosis tanaman sekarang.</p>
+          <p className="mt-4 text-primary-foreground/80">
+            Gratis selamanya untuk fitur dasar. Mulai diagnosis tanaman sekarang.
+          </p>
         </div>
         <p className="text-xs text-primary-foreground/70">© 2026 TaniAI Nexus</p>
       </div>
       <div className="flex flex-col justify-center px-6 py-12 lg:px-16">
         <div className="mx-auto w-full max-w-sm">
-          <div className="lg:hidden mb-8"><Logo /></div>
+          <div className="lg:hidden mb-8">
+            <Logo />
+          </div>
           <h1 className="text-2xl font-bold tracking-tight">Buat akun gratis</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">Sudah punya akun? <Link to="/login" className="font-semibold text-primary">Masuk</Link></p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Sudah punya akun?{" "}
+            <Link to="/login" className="font-semibold text-primary">
+              Masuk
+            </Link>
+          </p>
           <form onSubmit={submit} className="mt-8 space-y-4">
             <div>
               <Label htmlFor="name">Nama lengkap</Label>
-              <Input id="name" value={form.full_name} onChange={(e)=>setForm(f=>({...f,full_name:e.target.value}))} placeholder="Petani Nusantara" required />
+              <Input
+                id="name"
+                value={form.full_name}
+                onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+                placeholder="Petani Nusantara"
+                required
+              />
             </div>
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" value={form.email} onChange={(e)=>setForm(f=>({...f,email:e.target.value}))} placeholder="petani@email.com" required />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="petani@email.com"
+                required
+              />
             </div>
             <div>
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" autoComplete="new-password" value={form.password} onChange={(e)=>setForm(f=>({...f,password:e.target.value}))} placeholder="Min 6 karakter" required />
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Min 6 karakter"
+                required
+              />
             </div>
             <Button type="submit" className="w-full bg-gradient-primary" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

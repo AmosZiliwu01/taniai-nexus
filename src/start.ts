@@ -1,2 +1,2 @@
-// This file is no longer used in SPA mode - kept for compatibility
+// src/start.ts
 export const startInstance = undefined;

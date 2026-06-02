@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
+// Logo dengan opsional teks nama aplikasi
 export function Logo({ className, showText = true }: { className?: string; showText?: boolean }) {
   return (
     <Link to="/" className={cn("flex items-center gap-2.5", className)}>

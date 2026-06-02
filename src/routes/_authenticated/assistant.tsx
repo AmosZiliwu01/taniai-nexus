@@ -84,17 +84,13 @@ function Assistant() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [showConvList, setShowConvList] = useState(false);
 
-  // Keep a ref that always reflects the latest messages — used inside
-  // sendMutation to avoid stale-closure issues on the first message.
+  // Fetch status linking WhatsApp
   const messagesRef = useRef<Msg[]>(messages);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
-  // Guard: don't overwrite messages that were added optimistically by
-  // sendMutation with the (empty) result of a stale savedMessages query.
   const skipNextSyncRef = useRef(false);
-
   useEffect(() => {
     if (prefilledQuery && inputRef.current) {
       inputRef.current.focus();
@@ -103,7 +99,6 @@ function Assistant() {
     }
   }, [prefilledQuery]);
 
-  // ─── Load conversations ───────────────────────────────────────────────────
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
     queryFn: async () => {
@@ -126,7 +121,6 @@ function Assistant() {
     staleTime: 10_000,
   });
 
-  // ─── Load messages for active chat ───────────────────────────────────────
   const { data: savedMessages } = useQuery({
     queryKey: ["ai-messages", activeChatId],
     queryFn: async () => {
@@ -146,9 +140,6 @@ function Assistant() {
     staleTime: 5_000,
   });
 
-  // Sync saved messages → local state, but skip if sendMutation just added
-  // optimistic messages so we don't wipe them out before the DB query
-  // returns the persisted rows.
   useEffect(() => {
     if (!savedMessages) return;
     if (skipNextSyncRef.current) {
@@ -171,7 +162,6 @@ function Assistant() {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // ─── Build context ────────────────────────────────────────────────────────
   const buildContext = useCallback(() => {
     const activePlants = plants
       .filter((p) => p.status === "Aktif")
@@ -183,7 +173,6 @@ function Assistant() {
     };
   }, [plants, weather, location]);
 
-  // ─── Send mutation ────────────────────────────────────────────────────────
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {
       const {
@@ -210,23 +199,15 @@ function Assistant() {
 
       if (!chatId) throw new Error("ID percakapan tidak valid");
 
-      // Add optimistic user message immediately — read from ref so we always
-      // get the latest slice, even on the very first message of a session.
       const userMsg: Msg = { id: generateId(), role: "user", content: text };
-
-      // Tell the savedMessages sync effect to skip its next run so it doesn't
-      // wipe the optimistic messages before the DB returns them.
       skipNextSyncRef.current = true;
-
       setMessages((prev) => [...prev, userMsg]);
 
-      // Persist user message
       const { error: userMsgErr } = await supabase
         .from("ai_messages")
         .insert({ conversation_id: chatId, role: "user", content: text });
       if (userMsgErr) console.error("[ai_messages insert user]", userMsgErr);
 
-      // Build history for AI using the ref (always up-to-date)
       const historyForAI = [...messagesRef.current, userMsg]
         .slice(-12)
         .map((m) => ({ role: m.role, content: m.content }));
@@ -242,8 +223,6 @@ function Assistant() {
         content,
       };
 
-      // Another sync may fire after the assistant insert invalidates the
-      // query — skip it too so the optimistic assistant bubble stays visible.
       skipNextSyncRef.current = true;
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -258,7 +237,6 @@ function Assistant() {
     },
     onError: (e: Error) => {
       toast.error(e.message || "Gagal mengirim pesan");
-      // Roll back the optimistic user message
       setMessages((prev) => {
         const idx = [...prev].reverse().findIndex((m) => m.role === "user");
         if (idx === -1) return prev;
@@ -268,7 +246,7 @@ function Assistant() {
     },
   });
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
+  // Handle input change and auto-resize
   const handleSend = useCallback(() => {
     const text = input.trim();
     if (!text || sendMutation.isPending) return;
@@ -326,7 +304,7 @@ function Assistant() {
 
   const isFirstMessage = messages.length === 0 && !sendMutation.isPending;
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // Auto scroll to bottom on new messages
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col lg:h-[calc(100vh-6rem)]">
       <div className="grid flex-1 overflow-hidden lg:grid-cols-[280px_1fr]">

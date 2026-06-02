@@ -1,6 +1,4 @@
 // src/services/weather/weatherService.ts
-// OpenWeather API integration — real-time weather + REAL 7-day forecast
-
 export interface CurrentWeather {
   temp: number;
   feels_like: number;
@@ -37,12 +35,7 @@ export interface WeatherData {
 }
 
 export interface WeatherAlert {
-  type:
-    | "hujan_lebat"
-    | "badai"
-    | "kelembapan_tinggi"
-    | "kekeringan"
-    | "angin_kencang";
+  type: "hujan_lebat" | "badai" | "kelembapan_tinggi" | "kekeringan" | "angin_kencang";
   title: string;
   message: string;
   severity: "info" | "warning" | "danger";
@@ -66,9 +59,7 @@ function getCache(lat: number, lon: number): WeatherData | null {
 
     const cache: WeatherCache = JSON.parse(raw);
 
-    const sameLocation =
-      Math.abs(cache.lat - lat) < 0.05 &&
-      Math.abs(cache.lon - lon) < 0.05;
+    const sameLocation = Math.abs(cache.lat - lat) < 0.05 && Math.abs(cache.lon - lon) < 0.05;
 
     if (!sameLocation) return null;
 
@@ -91,15 +82,7 @@ function setCache(lat: number, lon: number, data: WeatherData): void {
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 }
 
-const DAYS_ID = [
-  "Minggu",
-  "Senin",
-  "Selasa",
-  "Rabu",
-  "Kamis",
-  "Jumat",
-  "Sabtu",
-];
+const DAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 function conditionToId(main: string, desc: string): string {
   const m = main.toLowerCase();
@@ -148,10 +131,7 @@ function conditionToId(main: string, desc: string): string {
   return "Cerah";
 }
 
-function buildAlerts(
-  current: CurrentWeather,
-  forecast: ForecastDay[]
-): WeatherAlert[] {
+function buildAlerts(current: CurrentWeather, forecast: ForecastDay[]): WeatherAlert[] {
   const alerts: WeatherAlert[] = [];
 
   if (current.humidity >= 85) {
@@ -163,9 +143,7 @@ function buildAlerts(
     });
   }
 
-  const heavyRainDay = forecast
-    .slice(0, 3)
-    .find((f) => f.rainfall > 20 || f.rain_chance > 70);
+  const heavyRainDay = forecast.slice(0, 3).find((f) => f.rainfall > 20 || f.rain_chance > 70);
 
   if (heavyRainDay) {
     alerts.push({
@@ -181,23 +159,18 @@ function buildAlerts(
       type: "angin_kencang",
       severity: "info",
       title: "Angin Cukup Kencang",
-      message: `Kecepatan angin ${Math.round(
-        current.wind_speed
-      )} km/jam.`,
+      message: `Kecepatan angin ${Math.round(current.wind_speed)} km/jam.`,
     });
   }
 
-  const noRain = forecast
-    .slice(0, 5)
-    .every((f) => f.rainfall < 2 && f.rain_chance < 30);
+  const noRain = forecast.slice(0, 5).every((f) => f.rainfall < 2 && f.rain_chance < 30);
 
   if (noRain && current.humidity < 55) {
     alerts.push({
       type: "kekeringan",
       severity: "warning",
       title: "Potensi Kekeringan",
-      message:
-        "Tidak ada hujan diprakirakan selama 5 hari ke depan.",
+      message: "Tidak ada hujan diprakirakan selama 5 hari ke depan.",
     });
   }
 
@@ -206,18 +179,14 @@ function buildAlerts(
       type: "badai",
       severity: "danger",
       title: "Waspada Badai",
-      message:
-        "Kondisi cuaca berbahaya. Hindari aktivitas di lahan terbuka.",
+      message: "Kondisi cuaca berbahaya. Hindari aktivitas di lahan terbuka.",
     });
   }
 
   return alerts;
 }
 
-export async function fetchWeather(
-  lat: number,
-  lon: number
-): Promise<WeatherData> {
+export async function fetchWeather(lat: number, lon: number): Promise<WeatherData> {
   const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY;
 
   if (!apiKey) {
@@ -234,30 +203,23 @@ export async function fetchWeather(
   // fetch current + forecast
   const [currentRes, forecastRes] = await Promise.all([
     fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=id`
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=id`,
     ),
 
     fetch(
-      `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=id&cnt=40`
+      `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=id&cnt=40`,
     ),
   ]);
 
   if (!currentRes.ok) {
-    throw new Error(
-      `Gagal mengambil data cuaca: ${currentRes.status}`
-    );
+    throw new Error(`Gagal mengambil data cuaca: ${currentRes.status}`);
   }
 
   if (!forecastRes.ok) {
-    throw new Error(
-      `Gagal mengambil prakiraan: ${forecastRes.status}`
-    );
+    throw new Error(`Gagal mengambil prakiraan: ${forecastRes.status}`);
   }
 
-  const [cData, fData] = await Promise.all([
-    currentRes.json(),
-    forecastRes.json(),
-  ]);
+  const [cData, fData] = await Promise.all([currentRes.json(), forecastRes.json()]);
 
   // current weather
   const current: CurrentWeather = {
@@ -273,10 +235,7 @@ export async function fetchWeather(
 
     rainfall_1h: cData.rain?.["1h"] ?? 0,
 
-    condition: conditionToId(
-      cData.weather[0].main,
-      cData.weather[0].description
-    ),
+    condition: conditionToId(cData.weather[0].main, cData.weather[0].description),
 
     description: cData.weather[0].description,
 
@@ -364,26 +323,16 @@ export async function fetchWeather(
   for (const [date, items] of sortedDays) {
     const temps = items.map((i) => i.main.temp);
 
-    const humidities = items.map(
-      (i) => i.main.humidity
-    );
+    const humidities = items.map((i) => i.main.humidity);
 
-    const winds = items.map(
-      (i) => i.wind?.speed ?? 0
-    );
+    const winds = items.map((i) => i.wind?.speed ?? 0);
 
-    const rainfalls = items.map(
-      (i) => i.rain?.["3h"] ?? 0
-    );
+    const rainfalls = items.map((i) => i.rain?.["3h"] ?? 0);
 
-    const rainProbs = items.map(
-      (i) => i.pop ?? 0
-    );
+    const rainProbs = items.map((i) => i.pop ?? 0);
 
     const noonItem =
-      items.find((i) =>
-        i.dt_txt.includes("12:00")
-      ) ?? items[Math.floor(items.length / 2)];
+      items.find((i) => i.dt_txt.includes("12:00")) ?? items[Math.floor(items.length / 2)];
 
     const d = new Date(date + "T00:00:00");
 
@@ -396,34 +345,19 @@ export async function fetchWeather(
 
       temp_min: Math.round(Math.min(...temps)),
 
-      humidity: Math.round(
-        humidities.reduce((a, b) => a + b, 0) /
-          humidities.length
-      ),
+      humidity: Math.round(humidities.reduce((a, b) => a + b, 0) / humidities.length),
 
-      wind_speed: Math.round(
-        (winds.reduce((a, b) => a + b, 0) /
-          winds.length) *
-          3.6
-      ),
+      wind_speed: Math.round((winds.reduce((a, b) => a + b, 0) / winds.length) * 3.6),
 
-      rainfall:
-        Math.round(
-          rainfalls.reduce((a, b) => a + b, 0) * 10
-        ) / 10,
+      rainfall: Math.round(rainfalls.reduce((a, b) => a + b, 0) * 10) / 10,
 
-      condition: conditionToId(
-        noonItem.weather[0].main,
-        noonItem.weather[0].description
-      ),
+      condition: conditionToId(noonItem.weather[0].main, noonItem.weather[0].description),
 
       description: noonItem.weather[0].description,
 
       icon: noonItem.weather[0].icon,
 
-      rain_chance: Math.round(
-        Math.max(...rainProbs) * 100
-      ),
+      rain_chance: Math.round(Math.max(...rainProbs) * 100),
     });
   }
 
@@ -457,9 +391,7 @@ export async function fetchWeather(
   return result;
 }
 
-export function getMockWeather(
-  cityName: string
-): WeatherData {
+export function getMockWeather(cityName: string): WeatherData {
   const today = new Date();
 
   const forecast: ForecastDay[] = Array.from({
@@ -486,11 +418,7 @@ export function getMockWeather(
 
       rainfall: isRainy ? 12 : 0,
 
-      condition: isRainy
-        ? "Hujan"
-        : i === 1
-        ? "Cerah Berawan"
-        : "Cerah",
+      condition: isRainy ? "Hujan" : i === 1 ? "Cerah Berawan" : "Cerah",
 
       description: isRainy ? "hujan" : "cerah",
 
@@ -533,9 +461,7 @@ export function getMockWeather(
   };
 }
 
-export function conditionToLucideIcon(
-  condition: string
-): string {
+export function conditionToLucideIcon(condition: string): string {
   const c = condition.toLowerCase();
 
   if (c.includes("badai") || c.includes("petir")) {
@@ -546,10 +472,7 @@ export function conditionToLucideIcon(
     return "cloud-rain";
   }
 
-  if (
-    c.includes("gerimis") ||
-    c.includes("hujan ringan")
-  ) {
+  if (c.includes("gerimis") || c.includes("hujan ringan")) {
     return "cloud-drizzle";
   }
 
@@ -557,17 +480,11 @@ export function conditionToLucideIcon(
     return "cloud-rain";
   }
 
-  if (
-    c.includes("berkabut") ||
-    c.includes("kabut")
-  ) {
+  if (c.includes("berkabut") || c.includes("kabut")) {
     return "cloud-fog";
   }
 
-  if (
-    c.includes("berawan") &&
-    c.includes("cerah")
-  ) {
+  if (c.includes("berawan") && c.includes("cerah")) {
     return "cloud-sun";
   }
 
@@ -582,9 +499,7 @@ export function conditionToLucideIcon(
   return "cloud-sun";
 }
 
-export function conditionToColor(
-  condition: string
-): string {
+export function conditionToColor(condition: string): string {
   const c = condition.toLowerCase();
 
   if (c.includes("badai")) {

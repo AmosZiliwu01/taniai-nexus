@@ -1,12 +1,13 @@
 // src/hooks/useWeather.ts
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+import { fetchWeather, getMockWeather, type WeatherData } from "@/services/weather/weatherService";
 import {
-  fetchWeather, getMockWeather, type WeatherData,
-} from "@/services/weather/weatherService";
-import {
-  autoDetectLocation, saveLocation, geocodeCity,
-  getSavedLocation, type UserLocation,
+  autoDetectLocation,
+  saveLocation,
+  geocodeCity,
+  getSavedLocation,
+  type UserLocation,
 } from "@/services/location/locationService";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -14,28 +15,39 @@ export function useWeather() {
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
 
-  // Detect location on mount
+  // Deteksi lokasi saat mount: cache → profil user → browser
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLocationLoading(true);
       try {
-        // 1. Cek cache dulu
         const cached = getSavedLocation();
-        if (cached && !cancelled) { setLocation(cached); setLocationLoading(false); return; }
+        if (cached && !cancelled) {
+          setLocation(cached);
+          setLocationLoading(false);
+          return;
+        }
 
-        // 2. Coba dari profile user
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
           const { data: prof } = await supabase
-            .from("profiles").select("location").eq("id", user.id).maybeSingle();
+            .from("profiles")
+            .select("location")
+            .eq("id", user.id)
+            .maybeSingle();
           if (prof?.location) {
             const loc = await geocodeCity(prof.location);
-            if (loc && !cancelled) { saveLocation(loc); setLocation(loc); setLocationLoading(false); return; }
+            if (loc && !cancelled) {
+              saveLocation(loc);
+              setLocation(loc);
+              setLocationLoading(false);
+              return;
+            }
           }
         }
 
-        // 3. Auto-detect dari browser
         const detected = await autoDetectLocation();
         if (!cancelled) setLocation(detected);
       } catch {
@@ -44,7 +56,9 @@ export function useWeather() {
         if (!cancelled) setLocationLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const weatherQuery = useQuery<WeatherData>({
@@ -63,32 +77,34 @@ export function useWeather() {
     },
 
     enabled: !locationLoading,
-
-    // cache 30 menit
     staleTime: 30 * 60 * 1000,
-
-    // simpan cache 1 jam
     gcTime: 60 * 60 * 1000,
-
-    // JANGAN auto refresh saat pindah halaman / focus
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
+    retry: 1,
+  });
 
-  retry: 1,
-});
-
+  // Ganti lokasi berdasarkan nama kota
   const changeLocation = async (cityName: string) => {
     const loc = await geocodeCity(cityName);
-    if (loc) { saveLocation(loc); setLocation(loc); }
-    else {
-      const fallback: UserLocation = { lat: -6.2, lon: 106.8, city: cityName, province: "", displayName: cityName };
+    if (loc) {
+      saveLocation(loc);
+      setLocation(loc);
+    } else {
+      const fallback: UserLocation = {
+        lat: -6.2,
+        lon: 106.8,
+        city: cityName,
+        province: "",
+        displayName: cityName,
+      };
       saveLocation(fallback);
       setLocation(fallback);
     }
   };
 
-  // Set lokasi langsung dari koordinat (untuk map picker)
+  // Set lokasi langsung dari koordinat (map picker)
   const setLocationByCoords = (loc: UserLocation) => {
     saveLocation(loc);
     setLocation(loc);
@@ -108,7 +124,7 @@ export function useWeather() {
   };
 }
 
-// Compact weather summary string untuk AI context
+// Ringkasan cuaca singkat untuk konteks AI
 export function getWeatherSummary(weather: WeatherData | null): string {
   if (!weather) return "tidak diketahui";
   const c = weather.current;

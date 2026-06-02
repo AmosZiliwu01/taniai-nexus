@@ -9,8 +9,6 @@ dist-ssr/
 *.local
 
 # Environment files (jangan commit key!)
-.env.local
-.env.*.local
 .env
 
 # Editor

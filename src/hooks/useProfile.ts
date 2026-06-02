@@ -1,6 +1,4 @@
 // src/hooks/useProfile.ts
-// Centralized profile hook — used by AppShell, community, etc.
-// Listens to "profile-updated" event emitted after save/avatar upload in profile page.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +20,9 @@ export function useProfile() {
   const query = useQuery({
     queryKey: ["my-profile"],
     queryFn: async (): Promise<Profile | null> => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
       const { data } = await supabase
         .from("profiles")
@@ -34,7 +34,7 @@ export function useProfile() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Refetch whenever profile is saved from the settings page
+  // Refetch saat profile disimpan dari halaman pengaturan
   useEffect(() => {
     const handler = () => qc.invalidateQueries({ queryKey: ["my-profile"] });
     window.addEventListener("profile-updated", handler);

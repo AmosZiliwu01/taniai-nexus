@@ -22,11 +22,14 @@ export interface UserPlantWithAge extends UserPlant {
   age_days: number;
 }
 
+// Ambil semua tanaman milik user, hitung umur dalam hari
 export function usePlants() {
   return useQuery({
     queryKey: ["user-plants"],
     queryFn: async (): Promise<UserPlantWithAge[]> => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return [];
       const { data, error } = await supabase
         .from("user_plants")
@@ -44,6 +47,7 @@ export function usePlants() {
   });
 }
 
+// Tambah tanaman baru milik user yang sedang login
 export function useAddPlant() {
   const qc = useQueryClient();
   return useMutation({
@@ -55,7 +59,9 @@ export function useAddPlant() {
       soil_condition: string;
       notes?: string;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Tidak terautentikasi");
       const { error } = await supabase.from("user_plants").insert({
         ...plant,
@@ -72,6 +78,7 @@ export function useAddPlant() {
   });
 }
 
+// Hapus tanaman berdasarkan id
 export function useDeletePlant() {
   const qc = useQueryClient();
   return useMutation({
@@ -87,6 +94,7 @@ export function useDeletePlant() {
   });
 }
 
+// Update status tanaman (misal: Aktif → Panen)
 export function useUpdatePlantStatus() {
   const qc = useQueryClient();
   return useMutation({

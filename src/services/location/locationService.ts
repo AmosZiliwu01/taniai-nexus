@@ -1,6 +1,4 @@
 // src/services/location/locationService.ts
-// Centralized location service — reusable untuk weather, market, AI, analytics
-
 export interface UserLocation {
   lat: number;
   lon: number;
@@ -16,8 +14,6 @@ interface CachedLocation {
   location: UserLocation;
   timestamp: number;
 }
-
-// ─── Simpan & Baca dari localStorage ────────────────────────────────────────
 
 export function saveLocation(loc: UserLocation): void {
   const cached: CachedLocation = { location: loc, timestamp: Date.now() };
@@ -40,27 +36,28 @@ export function clearSavedLocation(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-// ─── Browser Geolocation ─────────────────────────────────────────────────────
-
+// Browser Geolocation
 export async function getBrowserLocation(): Promise<{ lat: number; lon: number } | null> {
   return new Promise((resolve) => {
-    if (!navigator.geolocation) { resolve(null); return; }
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
       () => resolve(null),
-      { timeout: 8000, maximumAge: 5 * 60 * 1000 }
+      { timeout: 8000, maximumAge: 5 * 60 * 1000 },
     );
   });
 }
 
-// ─── Reverse Geocode via OpenWeather ────────────────────────────────────────
-
+// Reverse Geocode via OpenWeather
 export async function reverseGeocode(lat: number, lon: number): Promise<UserLocation | null> {
   const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY;
   if (!apiKey) return null;
   try {
     const res = await fetch(
-      `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`
+      `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`,
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -69,7 +66,8 @@ export async function reverseGeocode(lat: number, lon: number): Promise<UserLoca
     const city = item.local_names?.id ?? item.name ?? "Unknown";
     const province = item.state ?? "";
     return {
-      lat, lon,
+      lat,
+      lon,
       city,
       province,
       displayName: province ? `${city}, ${province}` : city,
@@ -79,14 +77,13 @@ export async function reverseGeocode(lat: number, lon: number): Promise<UserLoca
   }
 }
 
-// ─── Forward Geocode (cari kota by nama) ────────────────────────────────────
-
+// Forward Geocode (cari kota by nama)
 export async function geocodeCity(cityName: string): Promise<UserLocation | null> {
   const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY;
   if (!apiKey) return null;
   try {
     const res = await fetch(
-      `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(cityName)},ID&limit=1&appid=${apiKey}`
+      `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(cityName)},ID&limit=1&appid=${apiKey}`,
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -106,7 +103,7 @@ export async function geocodeCity(cityName: string): Promise<UserLocation | null
   }
 }
 
-// ─── Auto-detect lokasi user ─────────────────────────────────────────────────
+// Auto-detect lokasi user
 
 export async function autoDetectLocation(): Promise<UserLocation | null> {
   // 1. Coba dari cache
@@ -136,8 +133,7 @@ export async function autoDetectLocation(): Promise<UserLocation | null> {
   return null;
 }
 
-// ─── Daftar kota Indonesia untuk autocomplete ────────────────────────────────
-
+// Daftar kota Indonesia untuk autocomplete
 export const INDONESIAN_CITIES: { name: string; lat: number; lon: number; province: string }[] = [
   { name: "Jakarta", lat: -6.2088, lon: 106.8456, province: "DKI Jakarta" },
   { name: "Surabaya", lat: -7.2575, lon: 112.7521, province: "Jawa Timur" },

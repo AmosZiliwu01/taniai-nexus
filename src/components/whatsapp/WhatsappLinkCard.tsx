@@ -1,8 +1,17 @@
 // src/components/whatsapp/WhatsappLinkCard.tsx
-// Komponen card untuk menghubungkan / memutus WhatsApp dari akun web
 
 import { useState, useEffect } from "react";
-import { Smartphone, Link2, Link2Off, Copy, Check, RefreshCw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Smartphone,
+  Link2,
+  Link2Off,
+  Copy,
+  Check,
+  RefreshCw,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -12,17 +21,24 @@ import { id } from "date-fns/locale";
 
 export function WhatsappLinkCard() {
   const {
-    isLinked, phoneNumber, linkedAt, statusLoading,
-    pairingCode, codeExpiry, isCodeExpired,
-    generateCode, isGenerating,
-    unlink, isUnlinking,
+    isLinked,
+    phoneNumber,
+    linkedAt,
+    statusLoading,
+    pairingCode,
+    codeExpiry,
+    isCodeExpired,
+    generateCode,
+    isGenerating,
+    unlink,
+    isUnlinking,
     refetchStatus,
   } = useWhatsappLink();
 
   const [copied, setCopied] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
-  // Countdown timer saat kode aktif
+  // Countdown timer kode pairing
   useEffect(() => {
     if (!codeExpiry || isCodeExpired) return;
 
@@ -49,7 +65,6 @@ export function WhatsappLinkCard() {
       ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, "0")}`
       : "0:00";
 
-  // ── LOADING STATE ──
   if (statusLoading) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 flex items-center gap-3 text-muted-foreground">
@@ -59,11 +74,10 @@ export function WhatsappLinkCard() {
     );
   }
 
-  // ── SUDAH TERHUBUNG ──
+  // Tampilan jika WhatsApp sudah terhubung
   if (isLinked) {
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 p-5 space-y-4">
-        {/* Header */}
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-emerald-500 p-2.5 shrink-0">
             <CheckCircle2 className="size-5 text-white" />
@@ -83,13 +97,11 @@ export function WhatsappLinkCard() {
           </div>
         </div>
 
-        {/* Info */}
         <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/40 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-          🌾 TaniAI di WhatsApp sudah aktif! Kamu bisa chat langsung dari WhatsApp
-          dan AI akan mengenali akunmu secara personal.
+          🌾 TaniAI di WhatsApp sudah aktif! Kamu bisa chat langsung dari WhatsApp dan AI akan
+          mengenali akunmu secara personal.
         </div>
 
-        {/* Unlink button */}
         <Button
           variant="outline"
           size="sm"
@@ -108,10 +120,9 @@ export function WhatsappLinkCard() {
     );
   }
 
-  // ── BELUM TERHUBUNG — tampilkan flow pairing ──
+  // Tampilan flow pairing jika belum terhubung
   return (
     <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
-      {/* Header */}
       <div className="flex items-start gap-3">
         <div className="rounded-xl bg-primary/10 p-2.5 shrink-0">
           <Smartphone className="size-5 text-primary" />
@@ -124,10 +135,8 @@ export function WhatsappLinkCard() {
         </div>
       </div>
 
-      {/* Kode aktif */}
       {pairingCode && !isCodeExpired ? (
         <div className="space-y-3">
-          {/* Step guide */}
           <ol className="text-sm text-muted-foreground space-y-1.5 list-none">
             {[
               "Buka WhatsApp di HP kamu",
@@ -143,19 +152,13 @@ export function WhatsappLinkCard() {
             ))}
           </ol>
 
-          {/* Kode box */}
           <div className="rounded-xl bg-muted border border-dashed border-border p-4">
             <p className="text-xs text-muted-foreground mb-2">Kirim pesan ini ke bot:</p>
             <div className="flex items-center gap-3">
               <code className="text-lg font-mono font-bold tracking-widest text-primary flex-1">
                 LINK {pairingCode}
               </code>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCopy}
-                className="shrink-0"
-              >
+              <Button size="sm" variant="outline" onClick={handleCopy} className="shrink-0">
                 {copied ? (
                   <Check className="size-4 text-emerald-500" />
                 ) : (
@@ -165,29 +168,22 @@ export function WhatsappLinkCard() {
             </div>
           </div>
 
-          {/* Countdown + refresh */}
           <div className="flex items-center justify-between text-sm">
             <span
               className={cn(
                 "text-muted-foreground",
-                countdown < 60 && "text-orange-500 font-medium"
+                countdown < 60 && "text-orange-500 font-medium",
               )}
             >
               ⏱ Kode berakhir dalam {countdownLabel}
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={refetchStatus}
-              className="text-xs"
-            >
+            <Button variant="ghost" size="sm" onClick={() => refetchStatus()} className="text-xs">
               <RefreshCw className="size-3 mr-1" />
               Cek status
             </Button>
           </div>
         </div>
       ) : (
-        // Belum ada kode / kode expired
         <div className="space-y-3">
           {isCodeExpired && (
             <div className="flex items-center gap-2 text-sm text-orange-600 bg-orange-50 dark:bg-orange-950/20 rounded-lg px-3 py-2">
@@ -205,11 +201,7 @@ export function WhatsappLinkCard() {
             </ol>
           </div>
 
-          <Button
-            onClick={generateCode}
-            disabled={isGenerating}
-            className="w-full"
-          >
+          <Button onClick={generateCode} disabled={isGenerating} className="w-full">
             {isGenerating ? (
               <Loader2 className="size-4 animate-spin mr-2" />
             ) : (

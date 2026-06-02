@@ -31,7 +31,7 @@ import { useNotifications, getNotificationLink } from "@/hooks/useNotifications"
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import { formatNotificationBody } from "@/hooks/useNotifications";
-// ─── Desktop sidebar nav links ───────────────────────────────────────────────
+
 const navGroups = [
   {
     label: "Utama",
@@ -67,7 +67,6 @@ const mobileNav = [
   { to: "/profile", icon: UserIcon, label: "Akun" },
 ] as const;
 
-// ─── NavList (sidebar) ────────────────────────────────────────────────────────
 function NavList({
   pathname,
   onClick,
@@ -131,7 +130,6 @@ function NavList({
   );
 }
 
-// ─── Global Search ────────────────────────────────────────────────────────────
 const searchItems = [
   {
     label: "Diagnosa Tanaman",
@@ -206,7 +204,6 @@ function GlobalSearch() {
   );
 }
 
-// ─── Notification Dropdown ────────────────────────────────────────────────────
 function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -221,12 +218,12 @@ function NotificationDropdown() {
     info: "ℹ️",
   };
 
+  // Ekstrak postId dari body notifikasi lalu navigasi ke halaman terkait
   const handleNotificationClick = (notif: any) => {
     const link = getNotificationLink(notif);
     markRead.mutate(notif.id);
     setOpen(false);
 
-    // Ekstrak postId dari body JSON
     let postId = null;
     try {
       const parsed = JSON.parse(notif.body || "{}");
@@ -342,9 +339,7 @@ function NotificationDropdown() {
   );
 }
 
-// ─── UserAvatar: avatar kecil di topbar dengan fallback inisial yang benar ───
-// Menggantikan shadcn Avatar agar onError tidak menyembunyikan img secara paksa
-// dan fallback inisial selalu tampil saat foto belum/tidak bisa dimuat.
+// Avatar dengan fallback inisial jika foto gagal dimuat
 function UserAvatarButton({
   name,
   email,
@@ -356,8 +351,6 @@ function UserAvatarButton({
 }) {
   const [imgFailed, setImgFailed] = useState(false);
 
-  // Hitung ulang saat avatarUrl berubah (login dengan akun berbeda)
-  // dengan mereset imgFailed
   const [currentSrc, setCurrentSrc] = useState(avatarUrl);
   if (avatarUrl !== currentSrc) {
     setCurrentSrc(avatarUrl);
@@ -370,7 +363,6 @@ function UserAvatarButton({
 
   return (
     <div className="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-muted/50 transition-colors cursor-pointer">
-      {/* Avatar dengan fallback inisial */}
       <div className="relative h-8 w-8 shrink-0">
         {avatarUrl && !imgFailed ? (
           <img
@@ -385,7 +377,6 @@ function UserAvatarButton({
           </div>
         )}
       </div>
-      {/* Nama & email — hanya tampil di sm ke atas */}
       <div className="hidden sm:block text-left">
         <p className="text-xs font-semibold leading-none">{displayName}</p>
         {subLabel && <p className="mt-0.5 text-[10px] text-muted-foreground">{subLabel}</p>}
@@ -394,7 +385,6 @@ function UserAvatarButton({
   );
 }
 
-// ─── Main AppShell ────────────────────────────────────────────────────────────
 export function AppShell({
   children,
   user,
@@ -447,11 +437,9 @@ export function AppShell({
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 h-full">{Sidebar}</div>
 
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
-        {/* Topbar */}
         <header className="shrink-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md lg:px-6">
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild>
@@ -468,10 +456,6 @@ export function AppShell({
 
           <div className="ml-auto flex items-center gap-1.5">
             <NotificationDropdown />
-            {/* ── Ganti komponen Avatar lama dengan UserAvatarButton ─────── */}
-            {/* Komponen baru ini menangani fallback dengan benar untuk semua
-                role user (bukan hanya admin) dan tidak menyembunyikan gambar
-                saat error tanpa memunculkan fallback inisial. */}
             <Link to="/profile">
               <UserAvatarButton
                 name={user.full_name ?? null}

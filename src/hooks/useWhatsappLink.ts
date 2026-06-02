@@ -1,6 +1,4 @@
 // src/hooks/useWhatsappLink.ts
-// Hook untuk manage status WhatsApp linking dari web
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +6,7 @@ import { toast } from "sonner";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// ── Helper: get JWT token dari Supabase session ───────────────
+// Ambil JWT token dari Supabase session
 async function getToken(): Promise<string | null> {
   const {
     data: { session },
@@ -16,7 +14,7 @@ async function getToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
-// ── API calls ─────────────────────────────────────────────────
+// Cek status linking WhatsApp
 async function fetchLinkStatus() {
   const token = await getToken();
   if (!token) throw new Error("Tidak terautentikasi");
@@ -34,6 +32,7 @@ async function fetchLinkStatus() {
   }>;
 }
 
+// Generate pairing code baru
 async function generateCode() {
   const token = await getToken();
   if (!token) throw new Error("Tidak terautentikasi");
@@ -55,6 +54,7 @@ async function generateCode() {
   }>;
 }
 
+// Putuskan WhatsApp dari akun
 async function unlinkWA() {
   const token = await getToken();
   if (!token) throw new Error("Tidak terautentikasi");
@@ -68,16 +68,12 @@ async function unlinkWA() {
   return res.json();
 }
 
-// ─────────────────────────────────────────────
-// HOOK
-// ─────────────────────────────────────────────
-
+// Hook untuk manage status WhatsApp linking
 export function useWhatsappLink() {
   const qc = useQueryClient();
   const [pairingCode, setPairingCode] = useState<string | null>(null);
-  const [codeExpiry, setCodeExpiry]   = useState<Date | null>(null);
+  const [codeExpiry, setCodeExpiry] = useState<Date | null>(null);
 
-  // Fetch status linking
   const {
     data: linkStatus,
     isLoading: statusLoading,
@@ -85,11 +81,10 @@ export function useWhatsappLink() {
   } = useQuery({
     queryKey: ["wa-link-status"],
     queryFn: fetchLinkStatus,
-    refetchInterval: pairingCode ? 5000 : false, // poll tiap 5 detik saat kode aktif
+    refetchInterval: pairingCode ? 5000 : false,
     staleTime: 0,
   });
 
-  // Generate pairing code
   const generateMutation = useMutation({
     mutationFn: generateCode,
     onSuccess: (data) => {
@@ -102,7 +97,6 @@ export function useWhatsappLink() {
     },
   });
 
-  // Unlink WhatsApp
   const unlinkMutation = useMutation({
     mutationFn: unlinkWA,
     onSuccess: () => {
@@ -116,7 +110,6 @@ export function useWhatsappLink() {
     },
   });
 
-  // Cek apakah kode sudah expired
   const isCodeExpired = codeExpiry ? new Date() > codeExpiry : false;
   if (isCodeExpired && pairingCode) {
     setPairingCode(null);
@@ -124,22 +117,19 @@ export function useWhatsappLink() {
   }
 
   return {
-    // Status
-    isLinked:     linkStatus?.linked ?? false,
-    phoneNumber:  linkStatus?.phoneNumber ?? null,
-    linkedAt:     linkStatus?.linkedAt ?? null,
+    isLinked: linkStatus?.linked ?? false,
+    phoneNumber: linkStatus?.phoneNumber ?? null,
+    linkedAt: linkStatus?.linkedAt ?? null,
     statusLoading,
     refetchStatus,
 
-    // Pairing code
-    pairingCode:    isCodeExpired ? null : pairingCode,
+    pairingCode: isCodeExpired ? null : pairingCode,
     codeExpiry,
     isCodeExpired,
-    generateCode:   () => generateMutation.mutate(),
-    isGenerating:   generateMutation.isPending,
+    generateCode: () => generateMutation.mutate(),
+    isGenerating: generateMutation.isPending,
 
-    // Unlink
-    unlink:     () => unlinkMutation.mutate(),
+    unlink: () => unlinkMutation.mutate(),
     isUnlinking: unlinkMutation.isPending,
   };
 }
