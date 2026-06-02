@@ -1,9 +1,24 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Leaf, MessageCircle, CloudSun,
-  ShoppingCart, BookOpen, BarChart3, Settings, LogOut, Menu,
-  Bell, Search, Shield, User as UserIcon, Users, ClipboardList, X, CheckCheck,
+  LayoutDashboard,
+  Leaf,
+  MessageCircle,
+  CloudSun,
+  ShoppingCart,
+  BookOpen,
+  BarChart3,
+  Settings,
+  LogOut,
+  Menu,
+  Bell,
+  Search,
+  Shield,
+  User as UserIcon,
+  Users,
+  ClipboardList,
+  X,
+  CheckCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -15,7 +30,7 @@ import { toast } from "sonner";
 import { useNotifications, getNotificationLink } from "@/hooks/useNotifications";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
-
+import { formatNotificationBody } from "@/hooks/useNotifications";
 // ─── Desktop sidebar nav links ───────────────────────────────────────────────
 const navGroups = [
   {
@@ -53,7 +68,15 @@ const mobileNav = [
 ] as const;
 
 // ─── NavList (sidebar) ────────────────────────────────────────────────────────
-function NavList({ pathname, onClick, isAdmin }: { pathname: string; onClick?: () => void; isAdmin?: boolean }) {
+function NavList({
+  pathname,
+  onClick,
+  isAdmin,
+}: {
+  pathname: string;
+  onClick?: () => void;
+  isAdmin?: boolean;
+}) {
   return (
     <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
       {navGroups.map((group) => (
@@ -73,7 +96,7 @@ function NavList({ pathname, onClick, isAdmin }: { pathname: string; onClick?: (
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                     active
                       ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                   )}
                 >
                   <n.icon className="h-[17px] w-[17px] shrink-0" />
@@ -87,7 +110,9 @@ function NavList({ pathname, onClick, isAdmin }: { pathname: string; onClick?: (
 
       {isAdmin && (
         <div>
-          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">Admin</p>
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+            Admin
+          </p>
           <Link
             to="/admin"
             onClick={onClick}
@@ -95,7 +120,7 @@ function NavList({ pathname, onClick, isAdmin }: { pathname: string; onClick?: (
               "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
               pathname.startsWith("/admin")
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
             )}
           >
             <Shield className="h-[17px] w-[17px] shrink-0" /> Admin Panel
@@ -108,7 +133,12 @@ function NavList({ pathname, onClick, isAdmin }: { pathname: string; onClick?: (
 
 // ─── Global Search ────────────────────────────────────────────────────────────
 const searchItems = [
-  { label: "Diagnosa Tanaman", desc: "Analisa penyakit dari foto", url: "/plant-doctor", icon: "🌿" },
+  {
+    label: "Diagnosa Tanaman",
+    desc: "Analisa penyakit dari foto",
+    url: "/plant-doctor",
+    icon: "🌿",
+  },
   { label: "AI Assistant", desc: "Tanya seputar pertanian", url: "/assistant", icon: "🤖" },
   { label: "Cuaca & Peringatan", desc: "Info cuaca real-time", url: "/weather", icon: "🌤️" },
   { label: "Harga Pasar", desc: "Harga komoditas terkini", url: "/marketplace", icon: "📊" },
@@ -124,12 +154,16 @@ function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
-  const results = query.length >= 1
-    ? searchItems.filter((i) =>
-        i.label.toLowerCase().includes(query.toLowerCase()) ||
-        i.desc.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 6)
-    : [];
+  const results =
+    query.length >= 1
+      ? searchItems
+          .filter(
+            (i) =>
+              i.label.toLowerCase().includes(query.toLowerCase()) ||
+              i.desc.toLowerCase().includes(query.toLowerCase()),
+          )
+          .slice(0, 6)
+      : [];
 
   const handleSelect = (url: string) => {
     navigate({ to: url });
@@ -142,7 +176,10 @@ function GlobalSearch() {
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <input
         value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(e.target.value.length > 0); }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(e.target.value.length > 0);
+        }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onFocus={() => query.length > 0 && setOpen(true)}
         placeholder="Cari fitur, tanaman, artikel..."
@@ -176,16 +213,33 @@ function NotificationDropdown() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
   const typeIcon: Record<string, string> = {
-    warning: "🌧️", success: "✅", community: "💬", diagnosis: "🌿", weather: "⛅", info: "ℹ️",
+    warning: "🌧️",
+    success: "✅",
+    community: "💬",
+    diagnosis: "🌿",
+    weather: "⛅",
+    info: "ℹ️",
   };
 
   const handleNotificationClick = (notif: any) => {
     const link = getNotificationLink(notif);
     markRead.mutate(notif.id);
     setOpen(false);
-    const postIdMatch = (notif.body || "").match(/POST_ID:([a-f0-9-]+)/);
-    const postId = postIdMatch ? postIdMatch[1] : null;
-    if ((notif.type === "community" || notif.type === "warning" || notif.type === "success") && postId) {
+
+    // Ekstrak postId dari body JSON
+    let postId = null;
+    try {
+      const parsed = JSON.parse(notif.body || "{}");
+      postId = parsed.post_id || null;
+    } catch {
+      const match = (notif.body || "").match(/POST_ID:([a-f0-9-]+)/);
+      postId = match ? match[1] : null;
+    }
+
+    if (
+      (notif.type === "community" || notif.type === "warning" || notif.type === "success") &&
+      postId
+    ) {
       navigate({ to: "/community", search: { post: postId } } as any);
     } else {
       navigate({ to: link as any });
@@ -193,8 +247,7 @@ function NotificationDropdown() {
   };
 
   const cleanBody = (body: string | null) => {
-    if (!body) return null;
-    return body.replace(/^POST_ID:[a-f0-9-]+\n?/, "").trim();
+    return formatNotificationBody(body);
   };
 
   return (
@@ -221,12 +274,21 @@ function NotificationDropdown() {
               <span className="font-semibold text-sm">Notifikasi</span>
               <div className="flex items-center gap-1">
                 {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs"
-                    onClick={() => markAllRead.mutate()}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => markAllRead.mutate()}
+                  >
                     <CheckCheck className="h-3 w-3" /> Tandai semua
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setOpen(false)}
+                >
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -244,7 +306,7 @@ function NotificationDropdown() {
                     onClick={() => handleNotificationClick(n)}
                     className={cn(
                       "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
-                      !n.is_read && "bg-primary/5"
+                      !n.is_read && "bg-primary/5",
                     )}
                   >
                     <span className="mt-0.5 text-base shrink-0">
@@ -254,12 +316,21 @@ function NotificationDropdown() {
                       <p className={cn("text-sm leading-snug", !n.is_read && "font-semibold")}>
                         {n.title}
                       </p>
-                      {n.body && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{cleanBody(n.body)}</p>}
+                      {n.body && (
+                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                          {cleanBody(n.body)}
+                        </p>
+                      )}
                       <p className="mt-1 text-[10px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: id })}
+                        {formatDistanceToNow(new Date(n.created_at), {
+                          addSuffix: true,
+                          locale: id,
+                        })}
                       </p>
                     </div>
-                    {!n.is_read && <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                    {!n.is_read && (
+                      <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    )}
                   </button>
                 ))
               )}
@@ -359,7 +430,7 @@ export function AppShell({
             "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
             pathname === "/profile"
               ? "bg-sidebar-accent text-sidebar-accent-foreground"
-              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
           )}
         >
           <Settings className="h-[17px] w-[17px] shrink-0" /> Pengaturan
@@ -388,7 +459,9 @@ export function AppShell({
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0">{Sidebar}</SheetContent>
+            <SheetContent side="left" className="w-72 p-0">
+              {Sidebar}
+            </SheetContent>
           </Sheet>
 
           <GlobalSearch />
@@ -421,7 +494,7 @@ export function AppShell({
                   to={n.to}
                   className={cn(
                     "flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors",
-                    active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    active ? "text-primary" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <n.icon className={cn("h-5 w-5", active && "scale-110 transition-transform")} />

@@ -21,8 +21,7 @@ export const Route = createFileRoute("/_authenticated/assistant")({
   }),
 });
 
-const generateId = () =>
-  Date.now().toString(36) + Math.random().toString(36).slice(2);
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 type Msg = { role: "user" | "assistant"; content: string; id: string };
 
@@ -57,10 +56,8 @@ function Assistant() {
   const latestActivePlant =
     [...plants]
       .filter((p) => p.status === "Aktif")
-      .sort(
-        (a, b) =>
-          new Date(b.plant_date).getTime() - new Date(a.plant_date).getTime()
-      )[0] ?? null;
+      .sort((a, b) => new Date(b.plant_date).getTime() - new Date(a.plant_date).getTime())[0] ??
+    null;
 
   const { data: latestDiagnosis = null } = useQuery({
     queryKey: ["assistant-latest-diagnosis"],
@@ -102,8 +99,7 @@ function Assistant() {
     if (prefilledQuery && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.style.height = "auto";
-      inputRef.current.style.height =
-        Math.min(inputRef.current.scrollHeight, 120) + "px";
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px";
     }
   }, [prefilledQuery]);
 
@@ -164,7 +160,7 @@ function Assistant() {
         id: m.id ?? generateId(),
         role: m.role as "user" | "assistant",
         content: m.content,
-      }))
+      })),
     );
   }, [savedMessages]);
 
@@ -228,8 +224,7 @@ function Assistant() {
       const { error: userMsgErr } = await supabase
         .from("ai_messages")
         .insert({ conversation_id: chatId, role: "user", content: text });
-      if (userMsgErr)
-        console.error("[ai_messages insert user]", userMsgErr);
+      if (userMsgErr) console.error("[ai_messages insert user]", userMsgErr);
 
       // Build history for AI using the ref (always up-to-date)
       const historyForAI = [...messagesRef.current, userMsg]
@@ -257,8 +252,7 @@ function Assistant() {
       const { error: asstMsgErr } = await supabase
         .from("ai_messages")
         .insert({ conversation_id: chatId, role: "assistant", content });
-      if (asstMsgErr)
-        console.error("[ai_messages insert assistant]", asstMsgErr);
+      if (asstMsgErr) console.error("[ai_messages insert assistant]", asstMsgErr);
 
       return content;
     },
@@ -266,9 +260,7 @@ function Assistant() {
       toast.error(e.message || "Gagal mengirim pesan");
       // Roll back the optimistic user message
       setMessages((prev) => {
-        const idx = [...prev]
-          .reverse()
-          .findIndex((m) => m.role === "user");
+        const idx = [...prev].reverse().findIndex((m) => m.role === "user");
         if (idx === -1) return prev;
         const realIdx = prev.length - 1 - idx;
         return [...prev.slice(0, realIdx), ...prev.slice(realIdx + 1)];
@@ -293,7 +285,7 @@ function Assistant() {
         handleSend();
       }
     },
-    [handleSend]
+    [handleSend],
   );
 
   const startNewChat = useCallback(() => {
@@ -313,16 +305,13 @@ function Assistant() {
       setMessages([]);
       setShowConvList(false);
     },
-    [activeChatId]
+    [activeChatId],
   );
 
   const deleteConversation = useCallback(
     async (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      const { error } = await supabase
-        .from("ai_conversations")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("ai_conversations").delete().eq("id", id);
       if (error) {
         console.error("[ai_conversations delete]", error);
         toast.error("Gagal menghapus percakapan");
@@ -332,7 +321,7 @@ function Assistant() {
       qc.invalidateQueries({ queryKey: ["ai-conversations"] });
       toast.success("Percakapan dihapus", { position: "top-right" });
     },
-    [activeChatId, startNewChat, qc]
+    [activeChatId, startNewChat, qc],
   );
 
   const isFirstMessage = messages.length === 0 && !sendMutation.isPending;
@@ -341,7 +330,6 @@ function Assistant() {
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col lg:h-[calc(100vh-6rem)]">
       <div className="grid flex-1 overflow-hidden lg:grid-cols-[280px_1fr]">
-
         {/* ── Sidebar (desktop) ── */}
         <div className="hidden flex-col border-r border-border bg-card lg:flex">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -369,12 +357,10 @@ function Assistant() {
                       "w-full rounded-xl px-3 py-2.5 text-left text-xs transition-colors",
                       activeChatId === conv.id
                         ? "bg-primary/10 text-primary font-medium"
-                        : "hover:bg-muted/50"
+                        : "hover:bg-muted/50",
                     )}
                   >
-                    <p className="truncate font-medium pr-6">
-                      {conv.title || "Percakapan baru"}
-                    </p>
+                    <p className="truncate font-medium pr-6">{conv.title || "Percakapan baru"}</p>
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
                       {format(new Date(conv.created_at), "d MMM yyyy", {
                         locale: idLocale,
@@ -396,7 +382,6 @@ function Assistant() {
 
         {/* ── Chat area ── */}
         <div className="flex flex-col overflow-hidden">
-
           {/* Mobile header */}
           <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
             <div className="flex items-center gap-2">
@@ -405,9 +390,7 @@ function Assistant() {
               </div>
               <div>
                 <p className="text-sm font-semibold">AI Assistant</p>
-                <p className="text-[10px] text-muted-foreground">
-                  Asisten pertanian Indonesia
-                </p>
+                <p className="text-[10px] text-muted-foreground">Asisten pertanian Indonesia</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -439,18 +422,14 @@ function Assistant() {
           {showConvList && (
             <div className="border-b border-border bg-card max-h-52 overflow-y-auto lg:hidden">
               {conversations.length === 0 ? (
-                <p className="px-4 py-3 text-xs text-muted-foreground">
-                  Belum ada percakapan
-                </p>
+                <p className="px-4 py-3 text-xs text-muted-foreground">Belum ada percakapan</p>
               ) : (
                 conversations.map((conv) => (
                   <div
                     key={conv.id}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2.5 transition-colors",
-                      activeChatId === conv.id
-                        ? "bg-primary/10"
-                        : "hover:bg-muted/50"
+                      activeChatId === conv.id ? "bg-primary/10" : "hover:bg-muted/50",
                     )}
                   >
                     {/* Tap to open */}
@@ -461,16 +440,13 @@ function Assistant() {
                       <MessageCircle
                         className={cn(
                           "h-3.5 w-3.5 shrink-0",
-                          activeChatId === conv.id
-                            ? "text-primary"
-                            : "text-muted-foreground"
+                          activeChatId === conv.id ? "text-primary" : "text-muted-foreground",
                         )}
                       />
                       <span
                         className={cn(
                           "truncate",
-                          activeChatId === conv.id &&
-                            "text-primary font-medium"
+                          activeChatId === conv.id && "text-primary font-medium",
                         )}
                       >
                         {conv.title || "Percakapan baru"}
@@ -518,8 +494,8 @@ function Assistant() {
                 <div>
                   <p className="font-semibold text-lg">Halo! Saya TaniAI 🌱</p>
                   <p className="mt-1 text-sm text-muted-foreground max-w-sm">
-                    Asisten pertanian cerdas khusus Indonesia. Tanyakan apapun
-                    seputar tanaman, hama, pupuk, cuaca, dan strategi panen.
+                    Asisten pertanian cerdas khusus Indonesia. Tanyakan apapun seputar tanaman,
+                    hama, pupuk, cuaca, dan strategi panen.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-2 w-full max-w-md sm:grid-cols-2">
@@ -532,8 +508,7 @@ function Assistant() {
                       }}
                       className="rounded-xl border border-green-200 bg-green-50 px-3 py-2.5 text-left text-xs font-medium hover:border-green-300 hover:bg-green-100 transition-colors text-green-800"
                     >
-                      🌱 Tips {latestActivePlant.name} di umur{" "}
-                      {latestActivePlant.age_days} HST?
+                      🌱 Tips {latestActivePlant.name} di umur {latestActivePlant.age_days} HST?
                     </button>
                   )}
                   {latestDiagnosis && (
@@ -545,18 +520,12 @@ function Assistant() {
                       }}
                       className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left text-xs font-medium hover:border-amber-300 hover:bg-amber-100 transition-colors text-amber-800"
                     >
-                      🔍 Cara atasi {latestDiagnosis.diagnosis} pada{" "}
-                      {latestDiagnosis.plant_type}?
+                      🔍 Cara atasi {latestDiagnosis.diagnosis} pada {latestDiagnosis.plant_type}?
                     </button>
                   )}
                   {SUGGESTIONS.slice(
                     0,
-                    Math.max(
-                      0,
-                      6 -
-                        (latestActivePlant ? 1 : 0) -
-                        (latestDiagnosis ? 1 : 0)
-                    )
+                    Math.max(0, 6 - (latestActivePlant ? 1 : 0) - (latestDiagnosis ? 1 : 0)),
                   ).map((s) => (
                     <button
                       key={s}
@@ -577,10 +546,7 @@ function Assistant() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={cn(
-                  "flex gap-3",
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                )}
+                className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}
               >
                 {msg.role === "assistant" && (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 self-end">
@@ -592,7 +558,7 @@ function Assistant() {
                     "max-w-[85%] rounded-2xl px-4 py-3",
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-card border border-border rounded-bl-sm shadow-sm"
+                      : "bg-card border border-border rounded-bl-sm shadow-sm",
                   )}
                 >
                   {msg.role === "assistant" ? (
@@ -632,8 +598,7 @@ function Assistant() {
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = "auto";
-                  e.target.style.height =
-                    Math.min(e.target.scrollHeight, 120) + "px";
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="Tanyakan seputar pertanian Indonesia..."
@@ -656,8 +621,7 @@ function Assistant() {
               </Button>
             </div>
             <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-              Enter kirim · Shift+Enter baris baru · AI khusus pertanian
-              Indonesia
+              AI khusus pertanian Indonesia
             </p>
           </div>
         </div>

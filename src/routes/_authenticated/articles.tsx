@@ -390,14 +390,10 @@ function injectSharedCSS() {
 // STORAGE & NORMALIZATION HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function extractStoragePaths(
-  content: string | null,
-  coverImage: string | null
-): string[] {
+function extractStoragePaths(content: string | null, coverImage: string | null): string[] {
   const paths: string[] = [];
   if (content) {
-    const regex =
-      /<img[^>]+src="[^"]*\/storage\/v1\/object\/public\/articles\/([^">]+)"/g;
+    const regex = /<img[^>]+src="[^"]*\/storage\/v1\/object\/public\/articles\/([^">]+)"/g;
     let match;
     while ((match = regex.exec(content)) !== null) paths.push(match[1]);
   }
@@ -414,10 +410,7 @@ async function deleteStorageFiles(paths: string[]): Promise<void> {
   if (error) console.warn("Storage cleanup:", error.message);
 }
 
-function convertImageWidthsToPercent(
-  html: string,
-  editorWidth: number
-): string {
+function convertImageWidthsToPercent(html: string, editorWidth: number): string {
   if (!html || editorWidth <= 0) return html;
   const div = document.createElement("div");
   div.innerHTML = html;
@@ -482,7 +475,18 @@ function insertFloatClearfixes(container: HTMLElement): void {
       }
     }
     const blockTags = [
-      "H1","H2","H3","H4","H5","H6","UL","OL","BLOCKQUOTE","PRE","HR","TABLE",
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6",
+      "UL",
+      "OL",
+      "BLOCKQUOTE",
+      "PRE",
+      "HR",
+      "TABLE",
     ];
     if (blockTags.includes(el.tagName)) {
       if (inFloatContext) {
@@ -658,8 +662,7 @@ class ImageResizeModule {
     });
     if (this.toolbarEl) {
       const spaceAbove = ir.top - er.top;
-      this.toolbarEl.style.top =
-        spaceAbove < 54 ? `${ir.height + 6}px` : "-50px";
+      this.toolbarEl.style.top = spaceAbove < 54 ? `${ir.height + 6}px` : "-50px";
       this.toolbarEl.style.bottom = "auto";
     }
   }
@@ -714,8 +717,7 @@ class ImageResizeModule {
       border: "1px solid #e2e8f0",
       borderRadius: "12px",
       padding: "4px",
-      boxShadow:
-        "0 4px 20px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)",
       pointerEvents: "auto",
       zIndex: "103",
       whiteSpace: "nowrap",
@@ -744,8 +746,7 @@ class ImageResizeModule {
     });
 
     const sep = document.createElement("div");
-    sep.style.cssText =
-      "width:1px;height:20px;background:#e2e8f0;margin:0 3px;flex-shrink:0;";
+    sep.style.cssText = "width:1px;height:20px;background:#e2e8f0;margin:0 3px;flex-shrink:0;";
     this.toolbarEl.appendChild(sep);
 
     const widths = ["25%", "50%", "75%", "100%"];
@@ -774,12 +775,7 @@ class ImageResizeModule {
     window.addEventListener("resize", this.boundScroll);
   }
 
-  makeBtn(
-    inner: string,
-    title: string,
-    active: boolean,
-    onClick: () => void
-  ): HTMLButtonElement {
+  makeBtn(inner: string, title: string, active: boolean, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
     btn.innerHTML = inner;
     btn.title = title;
@@ -791,9 +787,7 @@ class ImageResizeModule {
         btn.style.color = "#0f172a";
       }
     });
-    btn.addEventListener("mouseleave", () =>
-      this.styleBtn(btn, btn.dataset.active === "true")
-    );
+    btn.addEventListener("mouseleave", () => this.styleBtn(btn, btn.dataset.active === "true"));
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       onClick();
@@ -901,7 +895,18 @@ function ArticleContentRenderer({ content }: { content: string }) {
     const children = Array.from(ref.current.childNodes);
     let inFloat = false;
     const blockTags = [
-      "H1","H2","H3","H4","H5","H6","UL","OL","BLOCKQUOTE","PRE","HR","TABLE",
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6",
+      "UL",
+      "OL",
+      "BLOCKQUOTE",
+      "PRE",
+      "HR",
+      "TABLE",
     ];
 
     for (let i = 0; i < children.length; i++) {
@@ -989,10 +994,7 @@ function ArticleDisplayCard({
   }, [coverImage]);
 
   const safeContent = content?.trim() ?? "";
-  const hasContent =
-    safeContent &&
-    safeContent !== "<p><br></p>" &&
-    safeContent !== "<p></p>";
+  const hasContent = safeContent && safeContent !== "<p><br></p>" && safeContent !== "<p></p>";
 
   const dateDisplay = (() => {
     if (!createdAt) return format(new Date(), "d MMMM yyyy", { locale: idLocale });
@@ -1051,31 +1053,24 @@ function ArticleDisplayCard({
 
         {/* Title */}
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
-          {title || (
-            isPreview ? (
+          {title ||
+            (isPreview ? (
               <span className="text-muted-foreground/40 italic font-normal text-xl">
                 Judul artikel...
               </span>
-            ) : null
-          )}
+            ) : null)}
         </h1>
 
         {/* Excerpt */}
-        {excerpt && (
-          <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-            {excerpt}
-          </p>
-        )}
+        {excerpt && <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{excerpt}</p>}
 
         {/* Author */}
         <div className="flex items-center gap-2.5 pb-6 mb-6 border-b border-border">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary shrink-0">
-            {((authorName || "T").slice(0, 1)).toUpperCase()}
+            {(authorName || "T").slice(0, 1).toUpperCase()}
           </div>
           <div>
-            <p className="text-sm font-semibold">
-              {authorName || "Tim TaniAI"}
-            </p>
+            <p className="text-sm font-semibold">{authorName || "Tim TaniAI"}</p>
             <p className="text-xs text-muted-foreground">Penulis</p>
           </div>
         </div>
@@ -1121,18 +1116,14 @@ function DeleteConfirmModal({
         </div>
         <h3 className="font-bold text-base">Hapus Artikel?</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{title}</span> akan dihapus permanen beserta semua gambarnya.
+          <span className="font-medium text-foreground">{title}</span> akan dihapus permanen beserta
+          semua gambarnya.
         </p>
         <div className="mt-5 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isPending}>
             Batal
           </Button>
-          <Button
-            variant="destructive"
-            className="flex-1"
-            onClick={onConfirm}
-            disabled={isPending}
-          >
+          <Button variant="destructive" className="flex-1" onClick={onConfirm} disabled={isPending}>
             {isPending ? "Menghapus..." : "Hapus"}
           </Button>
         </div>
@@ -1201,37 +1192,23 @@ function ArticlesPage() {
       let q = supabase
         .from("articles")
         .select(
-          "id, title, slug, excerpt, content, cover_image, author_name, created_at, published, read_minutes, category_id, article_categories(id, name, slug)"
+          "id, title, slug, excerpt, content, cover_image, author_name, created_at, published, read_minutes, category_id, article_categories(id, name, slug)",
         )
         .order("created_at", { ascending: false });
       if (debouncedSearch)
-        q = (q as any).or(
-          `title.ilike.%${debouncedSearch}%,excerpt.ilike.%${debouncedSearch}%`
-        );
-      if (selectedCategory !== "all")
-        q = (q as any).eq("category_id", selectedCategory);
+        q = (q as any).or(`title.ilike.%${debouncedSearch}%,excerpt.ilike.%${debouncedSearch}%`);
+      if (selectedCategory !== "all") q = (q as any).eq("category_id", selectedCategory);
       const { data, error } = await q;
       if (error) return [];
       return (data ?? []) as Article[];
     },
   });
 
-  const displayArticles = isAdmin
-    ? allArticles
-    : allArticles.filter((a) => a.published);
+  const displayArticles = isAdmin ? allArticles : allArticles.filter((a) => a.published);
 
   const togglePublish = useMutation({
-    mutationFn: async ({
-      id,
-      published,
-    }: {
-      id: string;
-      published: boolean;
-    }) => {
-      const { error } = await supabase
-        .from("articles")
-        .update({ published })
-        .eq("id", id);
+    mutationFn: async ({ id, published }: { id: string; published: boolean }) => {
+      const { error } = await supabase.from("articles").update({ published }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1249,14 +1226,8 @@ function ArticlesPage() {
         .eq("id", id)
         .single();
       if (fe) throw fe;
-      if (a)
-        await deleteStorageFiles(
-          extractStoragePaths(a.content, a.cover_image)
-        );
-      const { error } = await supabase
-        .from("articles")
-        .delete()
-        .eq("id", id);
+      if (a) await deleteStorageFiles(extractStoragePaths(a.content, a.cover_image));
+      const { error } = await supabase.from("articles").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1287,11 +1258,7 @@ function ArticlesPage() {
         article={viewArticle}
         onBack={() => setViewArticle(null)}
         relatedArticles={displayArticles
-          .filter(
-            (a) =>
-              a.id !== viewArticle.id &&
-              a.category_id === viewArticle.category_id
-          )
+          .filter((a) => a.id !== viewArticle.id && a.category_id === viewArticle.category_id)
           .slice(0, 3)}
         categories={categories}
         onSelectRelatedArticle={handleSelectRelatedArticle}
@@ -1308,8 +1275,7 @@ function ArticlesPage() {
             Pusat Edukasi
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Artikel pertanian, tips AI, dan panduan praktis untuk petani
-            Indonesia.
+            Artikel pertanian, tips AI, dan panduan praktis untuk petani Indonesia.
           </p>
         </div>
         {isAdmin && (
@@ -1335,7 +1301,7 @@ function ArticlesPage() {
                 "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all",
                 adminTab === tab
                   ? "bg-card shadow-card text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {tab === "list" ? "Tampilan Grid" : "Kelola Artikel"}
@@ -1362,32 +1328,22 @@ function ArticlesPage() {
             </button>
           )}
         </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 shrink-0">
-          <button
-            onClick={() => setSelectedCategory("all")}
-            className={cn(
-              "shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap",
-              selectedCategory === "all"
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted hover:bg-muted/70 text-muted-foreground"
-            )}
+        <div className="w-full sm:w-48 shrink-0">
+          <select
+            value={selectedCategory}
+            onChange={(e) => {
+              setSelectedCategory(e.target.value);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-medium outline-none focus:border-primary cursor-pointer"
           >
-            Semua
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedCategory(c.id)}
-              className={cn(
-                "shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap",
-                selectedCategory === c.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted hover:bg-muted/70 text-muted-foreground"
-              )}
-            >
-              {c.name}
-            </button>
-          ))}
+            <option value="all">Semua Kategori</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -1400,9 +1356,7 @@ function ArticlesPage() {
             setShowForm(true);
           }}
           onDelete={(id) => deleteArticle.mutate(id)}
-          onTogglePublish={(id, pub) =>
-            togglePublish.mutate({ id, published: pub })
-          }
+          onTogglePublish={(id, pub) => togglePublish.mutate({ id, published: pub })}
           onView={(a) => setViewArticle(a)}
         />
       ) : isLoading ? (
@@ -1489,7 +1443,7 @@ function ArticleCard({
       <div
         className={cn(
           "group overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated",
-          !article.published && isAdmin && "opacity-70 border-dashed"
+          !article.published && isAdmin && "opacity-70 border-dashed",
         )}
       >
         <div
@@ -1522,9 +1476,7 @@ function ArticleCard({
               <span
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                  article.published
-                    ? "bg-success/10 text-success"
-                    : "bg-warning/10 text-warning"
+                  article.published ? "bg-success/10 text-success" : "bg-warning/10 text-warning",
                 )}
               >
                 {article.published ? "Publik" : "Draft"}
@@ -1568,9 +1520,7 @@ function ArticleCard({
                   <button
                     onClick={onTogglePublish}
                     className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors"
-                    title={
-                      article.published ? "Jadikan draft" : "Publikasikan"
-                    }
+                    title={article.published ? "Jadikan draft" : "Publikasikan"}
                   >
                     {article.published ? (
                       <EyeOff className="h-3.5 w-3.5" />
@@ -1634,18 +1584,12 @@ function AdminArticleTable({
   onTogglePublish: (id: string, published: boolean) => void;
   onView: (a: Article) => void;
 }) {
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "published" | "draft"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const filtered = articles.filter((a) =>
-    statusFilter === "all"
-      ? true
-      : statusFilter === "published"
-      ? a.published
-      : !a.published
+    statusFilter === "all" ? true : statusFilter === "published" ? a.published : !a.published,
   );
 
   const handleDelete = async () => {
@@ -1687,7 +1631,7 @@ function AdminArticleTable({
                   "rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors",
                   statusFilter === s
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/70"
+                    : "bg-muted text-muted-foreground hover:bg-muted/70",
                 )}
               >
                 {s === "all" ? "Semua" : s === "published" ? "Publik" : "Draft"}
@@ -1696,9 +1640,7 @@ function AdminArticleTable({
           </div>
         </div>
         {filtered.length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            Tidak ada artikel.
-          </div>
+          <div className="py-12 text-center text-sm text-muted-foreground">Tidak ada artikel.</div>
         ) : (
           <div className="divide-y divide-border">
             {filtered.map((a) => (
@@ -1741,9 +1683,7 @@ function AdminArticleTable({
                   <span
                     className={cn(
                       "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                      a.published
-                        ? "bg-success/10 text-success"
-                        : "bg-warning/10 text-warning"
+                      a.published ? "bg-success/10 text-success" : "bg-warning/10 text-warning",
                     )}
                   >
                     {a.published ? "Publik" : "Draft"}
@@ -1858,8 +1798,7 @@ function ArticleDetail({
                           alt=""
                           className="h-full w-full object-cover group-hover:scale-105 transition-transform"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).style.display =
-                              "none";
+                            (e.target as HTMLImageElement).style.display = "none";
                           }}
                         />
                       ) : (
@@ -1911,13 +1850,7 @@ function ArticleDetail({
 // ARTICLE FORM MODAL — single column, lebar sama dengan detail artikel
 // ─────────────────────────────────────────────────────────────────────────────
 
-function FieldLabel({
-  children,
-  required,
-}: {
-  children: ReactNode;
-  required?: boolean;
-}) {
+function FieldLabel({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
     <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground mb-1.5">
       {children}
@@ -1957,7 +1890,7 @@ function ArticleFormModal({
 
   // ─── Ukur lebar kolom artikel (jika ada) ─────────────────────────────
   useEffect(() => {
-    const articleColumn = document.getElementById('article-main-column');
+    const articleColumn = document.getElementById("article-main-column");
     if (!articleColumn) {
       setModalWidth(912); // fallback
       return;
@@ -1980,8 +1913,7 @@ function ArticleFormModal({
       const link = document.createElement("link");
       link.id = "quill-snow-css";
       link.rel = "stylesheet";
-      link.href =
-        "https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css";
+      link.href = "https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css";
       document.head.appendChild(link);
     }
 
@@ -1996,9 +1928,7 @@ function ArticleFormModal({
         quillRef.current = null;
       }
       if (editorRef.current) {
-        editorRef.current.parentNode
-          ?.querySelectorAll(".img-ctrl")
-          .forEach((el) => el.remove());
+        editorRef.current.parentNode?.querySelectorAll(".img-ctrl").forEach((el) => el.remove());
         editorRef.current.innerHTML = "";
       }
       setEditorReady(false);
@@ -2040,11 +1970,7 @@ function ArticleFormModal({
                 input.onchange = async () => {
                   const file = input.files?.[0];
                   if (!file) return;
-                  if (
-                    !["image/jpeg", "image/png", "image/webp"].includes(
-                      file.type
-                    )
-                  ) {
+                  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
                     toast.error("Format tidak didukung (JPG/PNG/WebP)");
                     return;
                   }
@@ -2054,8 +1980,7 @@ function ArticleFormModal({
                   }
                   setUploadingImage(true);
                   try {
-                    const ext =
-                      file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+                    const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
                     const fileName = `content/${Date.now()}-${Math.random()
                       .toString(36)
                       .slice(2)}.${ext}`;
@@ -2100,9 +2025,7 @@ function ArticleFormModal({
 
       quillRef.current = instance;
 
-      const resizeModule = instance.getModule(
-        "imageResize"
-      ) as ImageResizeModule | undefined;
+      const resizeModule = instance.getModule("imageResize") as ImageResizeModule | undefined;
       resizeModule?.setContentRef(contentRef);
 
       if (editItem?.content) {
@@ -2116,9 +2039,7 @@ function ArticleFormModal({
 
       imgObserver = new MutationObserver((mutations) => {
         const hasStyleChange = mutations.some(
-          (m) =>
-            m.type === "attributes" &&
-            (m.target as HTMLElement).tagName === "IMG"
+          (m) => m.type === "attributes" && (m.target as HTMLElement).tagName === "IMG",
         );
         if (hasStyleChange && quillRef.current) {
           contentRef.current = quillRef.current.root.innerHTML ?? "";
@@ -2140,8 +2061,7 @@ function ArticleFormModal({
         if (!document.getElementById("quill-script")) {
           const script = document.createElement("script");
           script.id = "quill-script";
-          script.src =
-            "https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js";
+          script.src = "https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js";
           script.onload = () => {
             if (mounted) initQuill();
           };
@@ -2172,9 +2092,7 @@ function ArticleFormModal({
     }
     setGeneratingAI(true);
     try {
-      const categoryName =
-        categories.find((c) => c.id === form.category_id)?.name ||
-        "Pertanian";
+      const categoryName = categories.find((c) => c.id === form.category_id)?.name || "Pertanian";
       const html = await generateArticleContent({
         title: form.title,
         excerpt: form.excerpt || undefined,
@@ -2198,16 +2116,12 @@ function ArticleFormModal({
     const errors: Record<string, string> = {};
     if (!form.title.trim()) errors.title = "Judul wajib diisi";
     const c = contentRef.current;
-    if (!c || c === "<p><br></p>" || c.trim() === "")
-      errors.content = "Konten wajib diisi";
+    if (!c || c === "<p><br></p>" || c.trim() === "") errors.content = "Konten wajib diisi";
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
 
-  function setField<K extends keyof typeof form>(
-    key: K,
-    val: (typeof form)[K]
-  ) {
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
     if (fieldErrors[key])
       setFieldErrors((e) => {
@@ -2225,17 +2139,14 @@ function ArticleFormModal({
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Tidak terautentikasi");
       let content = contentRef.current;
-      if (!content || content === "<p><br></p>")
-        throw new Error("Konten wajib diisi");
+      if (!content || content === "<p><br></p>") throw new Error("Konten wajib diisi");
       const editorWidth =
         editorRef.current?.querySelector(".ql-editor")?.clientWidth ??
         editorRef.current?.clientWidth ??
         680;
       content = convertImageWidthsToPercent(content, editorWidth);
       content = normalizeImageFloats(content);
-      const readMin = form.read_minutes
-        ? parseInt(form.read_minutes)
-        : null;
+      const readMin = form.read_minutes ? parseInt(form.read_minutes) : null;
       const payload = {
         title: form.title.trim(),
         excerpt: form.excerpt.trim() || null,
@@ -2247,18 +2158,10 @@ function ArticleFormModal({
         read_minutes: readMin,
       };
       if (editItem) {
-        const oldPaths = extractStoragePaths(
-          editItem.content,
-          editItem.cover_image
-        );
+        const oldPaths = extractStoragePaths(editItem.content, editItem.cover_image);
         const newPaths = extractStoragePaths(content, form.cover_image);
-        await deleteStorageFiles(
-          oldPaths.filter((p) => !newPaths.includes(p))
-        );
-        const { error } = await supabase
-          .from("articles")
-          .update(payload)
-          .eq("id", editItem.id);
+        await deleteStorageFiles(oldPaths.filter((p) => !newPaths.includes(p)));
+        const { error } = await supabase.from("articles").update(payload).eq("id", editItem.id);
         if (error) throw error;
       } else {
         const slug =
@@ -2269,9 +2172,7 @@ function ArticleFormModal({
             .slice(0, 80) +
           "-" +
           Date.now();
-        const { error } = await supabase
-          .from("articles")
-          .insert({ ...payload, slug });
+        const { error } = await supabase.from("articles").insert({ ...payload, slug });
         if (error) throw error;
       }
     },
@@ -2323,7 +2224,7 @@ function ArticleFormModal({
               className={cn(
                 inputCls,
                 "font-medium text-base",
-                fieldErrors.title && "border-destructive"
+                fieldErrors.title && "border-destructive",
               )}
             />
             {fieldErrors.title && (
@@ -2364,7 +2265,7 @@ function ArticleFormModal({
                   "rounded-xl border overflow-hidden bg-background transition-all",
                   fieldErrors.content
                     ? "border-destructive"
-                    : "border-input focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
+                    : "border-input focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
                 )}
               >
                 {!editorReady && (
@@ -2381,7 +2282,7 @@ function ArticleFormModal({
                     "[&_.ql-container]:border-0",
                     "[&_.ql-editor]:min-h-[420px] [&_.ql-editor]:text-base [&_.ql-editor]:px-6 [&_.ql-editor]:sm:px-8 [&_.ql-editor]:py-4 [&_.ql-editor]:leading-relaxed",
                     "[&_.ql-editor]:relative [&_.ql-editor]:overflow-x-auto",
-                    isBusy && "[&_.ql-editor]:pointer-events-none [&_.ql-editor]:opacity-60"
+                    isBusy && "[&_.ql-editor]:pointer-events-none [&_.ql-editor]:opacity-60",
                   )}
                 />
               </div>
@@ -2507,21 +2408,19 @@ function ArticleFormModal({
               form.published
                 ? "border-success/30 bg-success/5 hover:bg-success/10"
                 : "border-border bg-muted/30 hover:bg-muted/50",
-              isBusy && "opacity-50 cursor-not-allowed"
+              isBusy && "opacity-50 cursor-not-allowed",
             )}
           >
             <div
               className={cn(
                 "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200",
-                form.published ? "bg-success" : "bg-muted-foreground/30"
+                form.published ? "bg-success" : "bg-muted-foreground/30",
               )}
             >
               <div
                 className="absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200"
                 style={{
-                  transform: form.published
-                    ? "translateX(1.375rem)"
-                    : "translateX(0.25rem)",
+                  transform: form.published ? "translateX(1.375rem)" : "translateX(0.25rem)",
                 }}
               />
             </div>
@@ -2530,9 +2429,7 @@ function ArticleFormModal({
                 {form.published ? "Publikasikan sekarang" : "Simpan sebagai draft"}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                {form.published
-                  ? "Terlihat semua pengguna"
-                  : "Hanya admin yang bisa lihat"}
+                {form.published ? "Terlihat semua pengguna" : "Hanya admin yang bisa lihat"}
               </p>
             </div>
             {form.published ? (

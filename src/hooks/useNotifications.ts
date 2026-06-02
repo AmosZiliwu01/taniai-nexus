@@ -11,9 +11,41 @@ export interface Notification {
   created_at: string;
 }
 
+// Helper untuk parse body JSON
+function parseBody(body: string | null): any {
+  if (!body) return { raw: null };
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { raw: body };
+  }
+}
+
+// Ekstrak POST_ID dari body notifikasi (support JSON dan plain text)
+function extractPostId(body: string | null): string | null {
+  if (!body) return null;
+  
+  const parsed = parseBody(body);
+  
+  // Coba dari JSON
+  if (parsed.post_id) {
+    return parsed.post_id;
+  }
+  
+  // Fallback ke regex untuk plain text
+  const m = body.match(/POST_ID:([a-f0-9-]+)/);
+  return m ? m[1] : null;
+}
+
+// Ekstrak comment_id jika ada
+function extractCommentId(body: string | null): string | null {
+  if (!body) return null;
+  const parsed = parseBody(body);
+  return parsed.comment_id || null;
+}
+
 export function useNotifications() {
   const qc = useQueryClient();
-  // Ref untuk track apakah subscription sudah aktif — mencegah double subscribe
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const query = useQuery({
@@ -42,13 +74,15 @@ export function useNotifications() {
       if (!prefs) return allNotifs;
 
       const typeToKey: Record<string, string> = {
-        community: "community",
-        diagnosis: "diagnosis",
-        weather: "weather",
-        ai: "ai",
-        warning: "_always",
-        success: "_always",
-        info: "_always",
+        community:      "community",
+        community_like: "community",
+        diagnosis:      "diagnosis",
+        weather:        "weather",
+        ai:             "ai",
+        report:         "_always",
+        warning:        "_always",
+        success:        "_always",
+        info:           "_always",
       };
 
       return allNotifs.filter((n) => {
@@ -66,14 +100,10 @@ export function useNotifications() {
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user || cancelled) return;
-
-      // Kalau sudah ada channel aktif, jangan buat lagi
       if (channelRef.current) return;
 
-      // Pakai nama channel unik per user agar tidak konflik
       const channelName = `notifications-realtime-${user.id}`;
 
-      // Hapus channel lama dengan nama sama kalau ada (dari session sebelumnya)
       supabase.getChannels().forEach((ch) => {
         if (ch.topic === `realtime:${channelName}`) {
           supabase.removeChannel(ch);
@@ -107,7 +137,7 @@ export function useNotifications() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);  // Hanya run sekali — qc tidak perlu jadi dependency karena stabil
+  }, []);
 
   const unreadCount = (query.data ?? []).filter((n) => !n.is_read).length;
 
@@ -146,45 +176,88 @@ export function useNotifications() {
   };
 }
 
-export async function pushNotification(
-  userId: string,
-  notification: {
-    title: string;
-    body?: string;
-    type?: "info" | "warning" | "success" | "community" | "diagnosis" | "weather" | "ai";
+// Format body untuk tampilan web
+export function formatNotificationBody(body: string | null): string {
+  if (!body) return "";
+  
+  const parsed = parseBody(body);
+  
+  // Untuk notifikasi warning (postingan dilarang dari admin)
+  if (parsed.message && (parsed.action === 'approved' || parsed.reason)) {
+    return parsed.message;
   }
-) {
-  await supabase.from("notifications").insert({
-    user_id: userId,
-    title: notification.title,
-    body: notification.body ?? null,
-    type: notification.type ?? "info",
-  });
+  
+  // Untuk notifikasi komentar
+  if (parsed.commenter_name && parsed.comment_content) {
+    return `${parsed.commenter_name}: "${parsed.comment_content}"`;
+  }
+  
+  // Untuk notifikasi laporan ditolak
+  if (parsed.action === 'rejected' && parsed.message) {
+    return parsed.message;
+  }
+  
+  // Untuk notifikasi dengan raw text
+  if (parsed.raw) {
+    return parsed.raw.replace(/POST_ID:[a-f0-9-]+\n?/, "").trim();
+  }
+  
+  // Fallback: tampilkan body apa adanya
+  return body.length > 100 ? body.substring(0, 100) + '...' : body;
 }
 
-// Fungsi untuk menentukan rute navigasi berdasarkan notifikasi (dengan ekstrak POST_ID)
+// Navigasi berdasarkan tipe notifikasi
 export function getNotificationLink(notification: Notification): string {
   const type = notification.type;
-  const body = notification.body || "";
-
-  const postIdMatch = body.match(/POST_ID:([a-f0-9-]+)/);
-  const postId = postIdMatch ? postIdMatch[1] : null;
+  const postId = extractPostId(notification.body);
+  const commentId = extractCommentId(notification.body);
 
   switch (type) {
     case "community":
-      return postId ? `/community?post=${postId}` : "/community";
+    case "community_like":
+      if (postId) {
+        return commentId ? `/community?post=${postId}&comment=${commentId}` : `/community?post=${postId}`;
+      }
+      return "/community";
     case "warning":
     case "success":
+    case "report":
       if (postId) return `/community?post=${postId}`;
-      return "/dashboard";
+      return "/admin";
     case "diagnosis":
       return "/plant-doctor";
     case "weather":
       return "/weather";
     case "ai":
       return "/assistant";
-    case "info":
     default:
       return "/dashboard";
   }
+}
+
+// Get icon untuk notifikasi
+export function getNotificationIcon(type: string | null): string {
+  const icons: Record<string, string> = {
+    warning: "⚠️",
+    success: "✅",
+    community: "💬",
+    community_like: "❤️",
+    diagnosis: "🌿",
+    weather: "⛅",
+    info: "ℹ️",
+    report: "📋",
+  };
+  return icons[type ?? "info"] ?? "🔔";
+}
+
+// Get warna untuk notifikasi
+export function getNotificationColor(type: string | null): string {
+  const colors: Record<string, string> = {
+    warning: "text-orange-600 bg-orange-50 border-orange-200",
+    success: "text-green-600 bg-green-50 border-green-200",
+    community: "text-blue-600 bg-blue-50 border-blue-200",
+    community_like: "text-red-600 bg-red-50 border-red-200",
+    info: "text-gray-600 bg-gray-50 border-gray-200",
+  };
+  return colors[type ?? "info"] ?? "text-gray-600 bg-gray-50";
 }
