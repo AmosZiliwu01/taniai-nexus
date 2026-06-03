@@ -302,54 +302,91 @@ function CommentInput({
     if (replyTarget) setTimeout(() => inputRef.current?.focus(), 60);
   }, [replyTarget]);
   const handleSubmit = async () => {
-    const trimmed = body.trim();
-    if (!trimmed || loading) return;
-    const finalContent = replyTarget ? `@${replyTarget.name} ${trimmed}` : trimmed;
-    const parentId = replyTarget ? (replyTarget.rootParentId ?? replyTarget.commentId) : null;
-    setLoading(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Login dahulu");
+  const trimmed = body.trim();
+  if (!trimmed || loading) return;
+  const finalContent = replyTarget ? `@${replyTarget.name} ${trimmed}` : trimmed;
+  const parentId = replyTarget ? (replyTarget.rootParentId ?? replyTarget.commentId) : null;
+  setLoading(true);
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Login dahulu");
 
-      const { error } = await supabase.from("community_comments").insert({
+    const { data: newComment, error } = await supabase
+      .from("community_comments")
+      .insert({
         post_id: postId,
         user_id: user.id,
         content: finalContent,
         parent_id: parentId,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Update comments_count
+    const { count: commCount } = await supabase
+      .from("community_comments")
+      .select("*", { count: "exact", head: true })
+      .eq("post_id", postId);
+    await supabase
+      .from("community_posts")
+      .update({ comments_count: commCount ?? 0 })
+      .eq("id", postId);
+
+    // ✅ Kirim notifikasi ke pemilik postingan (kecuali kalau dia yang komentar sendiri)
+    const { data: post } = await supabase
+      .from("community_posts")
+      .select("user_id, title")
+      .eq("id", postId)
+      .single();
+
+    if (post && post.user_id !== user.id) {
+      // Ambil nama komentator
+      const { data: commenterProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
+      const commenterName = commenterProfile?.full_name?.trim() || "Seseorang";
+
+      await supabase.from("notifications").insert({
+        user_id: post.user_id,
+        title: "💬 Komentar Baru",
+        body: JSON.stringify({
+          post_id: postId,
+          post_title: post.title,
+          commenter_name: commenterName,
+          comment_content: trimmed.slice(0, 100),
+          comment_id: newComment?.id ?? null,
+        }),
+        type: "community",
+        is_read: false,
+        wa_sent: false,
       });
-      if (error) throw error;
-
-      const { count: commCount } = await supabase
-        .from("community_comments")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", postId);
-      await supabase
-        .from("community_posts")
-        .update({ comments_count: commCount ?? 0 })
-        .eq("id", postId);
-
-      qc.setQueriesData({ queryKey: ["community-posts"] }, (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((p: any) =>
-          p.id === postId ? { ...p, comments_count: commCount ?? 0 } : p,
-        );
-      });
-
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["post-comments", postId] }),
-        qc.invalidateQueries({ queryKey: ["community-posts"] }),
-      ]);
-      setBody("");
-      onClearReply();
-      onSubmitted();
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // Update query cache
+    qc.setQueriesData({ queryKey: ["community-posts"] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((p: any) =>
+        p.id === postId ? { ...p, comments_count: commCount ?? 0 } : p,
+      );
+    });
+
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["post-comments", postId] }),
+      qc.invalidateQueries({ queryKey: ["community-posts"] }),
+    ]);
+    setBody("");
+    onClearReply();
+    onSubmitted();
+  } catch (e: any) {
+    toast.error(e.message);
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="space-y-1.5 pt-2">
       {replyTarget && (
