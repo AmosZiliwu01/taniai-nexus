@@ -97,7 +97,7 @@ Buat file `.env`:
 ```env
 # Supabase Configuration
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-anon-key
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 # AI Configuration - Fallback (Grok / xAI)
 VITE_GROK_API_KEY=your-grok-api-key

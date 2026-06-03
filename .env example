@@ -1,14 +1,18 @@
 # Supabase Configuration
+
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-anon-key
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 # AI Configuration - Fallback (Grok / xAI)
+
 VITE_GROK_API_KEY=your-grok-api-key
 VITE_GROQ_API_KEY_FB=your-groq-api-key-for-fb
 
 # API URL
-VITE_API_URL=https://your-api-url.com
+
+VITE_API_URL=http://localhost:3000
 
 # OpenWeather API Configuration
+
 VITE_OPENWEATHER_API_URL=https://api.openweathermap.org/data/2.5
 VITE_OPENWEATHER_API_KEY=your-openweather-api-key
