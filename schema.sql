@@ -264,7 +264,6 @@ CREATE TABLE public.ai_messages (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-
 -- ============================================================
 -- STEP 3: ENABLE ROW LEVEL SECURITY
 -- ============================================================
@@ -773,6 +772,20 @@ CREATE POLICY "Public read assets"     ON storage.objects FOR SELECT USING (buck
 CREATE POLICY "Public read qr-codes"   ON storage.objects FOR SELECT USING (bucket_id = 'qr-codes');
 CREATE POLICY "Public read whatsapp"   ON storage.objects FOR SELECT USING (bucket_id = 'whatsapp');
 
+--intsert kategori artikel jika masih kosong
+
+INSERT INTO article_categories (name, slug) VALUES
+('Irigasi & Pengairan', 'irigasi-pengairan'),
+('Bisnis Pertanian', 'bisnis-pertanian'),
+('Teknik Bertani', 'teknik-bertani'),
+('Pasca Panen', 'pasca-panen'),
+('Perkebunan', 'perkebunan'),
+('Teknologi Pertanian', 'teknologi-pertanian'),
+('Cuaca & Musim', 'cuaca-musim'),
+('Pupuk & Nutrisi', 'pupuk-nutrisi'),
+('Tanaman Pangan', 'tanaman-pangan'),
+('Hama & Penyakit', 'hama-penyakit')
+ON CONFLICT (slug) DO NOTHING;
 
 -- ============================================================
 -- STEP 9: SET ADMIN (opsional)

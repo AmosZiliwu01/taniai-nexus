@@ -1,5 +1,5 @@
 // src/routes/index.tsx
-import heroImg from "@/assets/hero-ai-farming.jpg";
+import heroImg from "@/assets/hero-ai-farming.png";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -260,13 +260,12 @@ function Landing() {
             </div>
           </div>
           <div className="relative lg:block hidden">
-            <div className="absolute -inset-4 rounded-3xl bg-gradient-primary opacity-20 blur-3xl" />
             <img
               src={heroImg}
               alt="AI farming dashboard"
               width={1536}
               height={1024}
-              className="relative w-full rounded-3xl shadow-elevated"
+              className="w-full"
             />
           </div>
         </div>
