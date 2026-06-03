@@ -181,7 +181,19 @@ function Admin() {
         .eq("role", "blocked")
         .in("user_id", ids);
       const blockedSet = new Set((blocked ?? []).map((r: any) => r.user_id));
-      return (data ?? []).map((u: any) => ({ ...u, is_blocked: blockedSet.has(u.id) }));
+
+      const { data: admins } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin")
+        .in("user_id", ids);
+      const adminSet = new Set((admins ?? []).map((r: any) => r.user_id));
+
+      return (data ?? []).map((u: any) => ({
+        ...u,
+        is_blocked: blockedSet.has(u.id),
+        is_admin: adminSet.has(u.id),
+      }));
     },
     enabled: adminVerified === true && activeTab === "users",
   });
@@ -418,12 +430,16 @@ function Admin() {
     mutationFn: async (userId: string) => {
       const { error } = await supabase
         .from("user_roles")
-        .upsert({ user_id: userId, role: "blocked" }, { onConflict: "user_id,role" } as any);
+        .insert({ user_id: userId, role: "blocked" });
       if (error) throw error;
       await pushNotification(userId, {
         title: "🚫 Akun Anda Diblokir",
-        body: "Akun Anda telah diblokir oleh admin. Hubungi administrator untuk informasi lebih lanjut.",
-        type: "warning",
+        body: JSON.stringify({
+          action: "blocked",
+          message:
+            "Akun Anda telah diblokir oleh admin TaniAI Nexus. Jika Anda merasa ini adalah kesalahan, silakan hubungi administrator.",
+        }),
+        type: "account",
       });
     },
     onSuccess: () => {
@@ -435,16 +451,32 @@ function Admin() {
 
   const unblockUser = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase
+      // Ambil id primary key row blocked-nya dulu
+      const { data: blockedRow, error: fetchError } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("role", "blocked")
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!blockedRow) throw new Error("Row blocked tidak ditemukan");
+
+      // Delete by primary key
+      const { error: deleteError } = await supabase
         .from("user_roles")
         .delete()
-        .eq("user_id", userId)
-        .eq("role", "blocked");
-      if (error) throw error;
+        .eq("id", blockedRow.id);
+
+      if (deleteError) throw deleteError;
+
       await pushNotification(userId, {
         title: "✅ Akun Anda Diaktifkan Kembali",
-        body: "Blokir akun Anda telah dicabut oleh admin. Anda sekarang dapat login kembali.",
-        type: "success",
+        body: JSON.stringify({
+          action: "unblocked",
+          message: "Blokir akun Anda telah dicabut oleh admin. Anda sekarang dapat login kembali.",
+        }),
+        type: "account",
       });
     },
     onSuccess: () => {
@@ -873,35 +905,41 @@ function Admin() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            {u.is_blocked ? (
+                          {u.is_admin ? (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                              Admin
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              {u.is_blocked ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 gap-1 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
+                                  onClick={() => handleUnblockUser(u)}
+                                >
+                                  <UserCheck className="h-3 w-3" /> Aktifkan
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 gap-1 px-2 text-xs text-amber-700 hover:bg-amber-50"
+                                  onClick={() => handleBlockUser(u)}
+                                >
+                                  <UserX className="h-3 w-3" /> Blokir
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 gap-1 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
-                                onClick={() => handleUnblockUser(u)}
+                                className="h-7 gap-1 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteUser(u)}
                               >
-                                <UserCheck className="h-3 w-3" /> Aktifkan
+                                <Trash2 className="h-3 w-3" /> Hapus
                               </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 gap-1 px-2 text-xs text-amber-700 hover:bg-amber-50"
-                                onClick={() => handleBlockUser(u)}
-                              >
-                                <UserX className="h-3 w-3" /> Blokir
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 gap-1 px-2 text-xs text-destructive hover:bg-destructive/10"
-                              onClick={() => handleDeleteUser(u)}
-                            >
-                              <Trash2 className="h-3 w-3" /> Hapus
-                            </Button>
-                          </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))

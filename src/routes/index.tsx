@@ -80,9 +80,9 @@ const features = [
     active: true,
   },
   {
-    icon: CloudSun,
-    title: "Cuaca & Peringatan",
-    desc: "Info cuaca real-time dan peringatan dini risiko penyakit tanaman.",
+    icon: MessageSquare,
+    title: "WhatsApp Bot AI",
+    desc: "Chat langsung dengan AI TaniAI via WhatsApp kapan saja, tanpa buka aplikasi.",
     active: true,
   },
   {
@@ -98,9 +98,9 @@ const features = [
     active: true,
   },
   {
-    icon: MessageSquare,
-    title: "WhatsApp Bot AI",
-    desc: "Chat langsung dengan AI TaniAI via WhatsApp kapan saja, tanpa buka aplikasi.",
+    icon: CloudSun,
+    title: "Cuaca & Peringatan",
+    desc: "Info cuaca real-time dan peringatan dini risiko penyakit tanaman.",
     active: true,
   },
 ];

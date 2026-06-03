@@ -189,7 +189,7 @@ function useWhatsappLink() {
   };
 }
 
-const WA_BOT_NUMBER = "088709718383";
+const WA_BOT_NUMBER = "6288709718383";
 const WA_BOT_DISPLAY = "0887-0971-8383";
 const WA_QR_URL =
   "https://zgiomlixpneyvujipplh.supabase.co/storage/v1/object/public/qr-codes/qr-codes-wa-tani-ai-nexus.png";

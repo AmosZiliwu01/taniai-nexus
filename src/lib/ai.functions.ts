@@ -2,7 +2,18 @@
 import { callAIWithRetry, type AIMessage } from "@/services/ai/aiService";
 import { z } from "zod";
 
-const FARMING_SYSTEM_PROMPT = `Anda TaniAI, asisten pertanian Indonesia. Jawab singkat maks 3 kalimat. Gunakan - untuk poin, ** untuk produk. Jika ditanya di luar pertanian, tolak sopan.`;
+const FARMING_SYSTEM_PROMPT = `Anda TaniAI, asisten pertanian Indonesia.
+
+ATURAN:
+- WAJIB bahasa Indonesia
+- Jawab SINGKAT maksimal 3 kalimat
+- Gunakan - untuk poin
+- ** untuk nama produk
+- Jika ditanya di luar pertanian, tolak sopan
+- Jangan Inggris
+- Jangan sampai jawaban terpotong, pastikan selesai
+
+Jika tidak tahu: "Maaf, saya tidak tahu."`;
 
 export interface ChatContext {
   userLocation?: string;
@@ -45,13 +56,13 @@ export async function chatAI(input: {
   const content = await callAIWithRetry({
     messages,
     systemPrompt: FARMING_SYSTEM_PROMPT + contextBlock,
-    maxTokens: 300,
+    maxTokens: 500,
   });
   return { content };
 }
 
 // Diagnosis tanaman dari gambar + konteks user
-const DIAGNOSIS_SYSTEM_PROMPT = `Anda ahli patologi tanaman senior untuk pertanian Indonesia. Analisis gambar dan konteks dengan teliti.
+const DIAGNOSIS_SYSTEM_PROMPT = `Anda ahli patologi tanaman senior untuk pertanian Indonesia. WAJIB memberikan output dalam BAHASA INDONESIA. Analisis gambar dan konteks dengan teliti.
 
 ATURAN:
 - Gambar bukan tanaman → is_plant_image: false
@@ -59,7 +70,8 @@ ATURAN:
 - Gambar blur tapi ada deskripsi → gunakan deskripsi sebagai dasar, turunkan confidence
 - Prioritaskan deskripsi dan gejala user di atas visual jika kualitas gambar rendah
 - Jangan mengarang diagnosis — lebih baik "tidak pasti"
-- Jawab HANYA JSON valid tanpa teks lain`;
+- Jawab HANYA JSON valid tanpa teks lain
+- Jawab dengan bahasa Indonesia, gunakan istilah lokal untuk penyakit dan tanaman`;
 
 export interface DiagnosisInput {
   imageBase64: string;
@@ -133,7 +145,7 @@ export async function diagnosePlant(
     .filter(Boolean)
     .join("\n");
 
-  const prompt = `Analisis foto tanaman ini.
+  const prompt = `Analisis foto tanaman ini. WAJIB memberikan semua nilai dalam BAHASA INDONESIA.
 
 KONTEKS:
 ${contextLines || "Tidak ada data tambahan"}
@@ -141,23 +153,23 @@ ${contextLines || "Tidak ada data tambahan"}
 Balas HANYA dengan JSON valid sesuai struktur ini:
 {
   "is_plant_image": true,
-  "detected_plant": "nama tanaman",
+  "detected_plant": "nama tanaman dalam Bahasa Indonesia",
   "plant_match": true,
   "plant_match_confidence": 90,
   "mismatch_warning": null,
-  "diagnosis": "nama penyakit",
+  "diagnosis": "nama penyakit dalam Bahasa Indonesia",
   "confidence": 78,
   "severity": "Sedang",
   "severity_score": 60,
-  "cause": "penyebab",
-  "cause_detail": "detail penyebab",
-  "description": "deskripsi",
-  "symptoms": ["gejala 1", "gejala 2"],
-  "initial_action": "tindakan awal",
-  "solution": "solusi",
-  "follow_up": "tindak lanjut",
-  "fertilizer": "pupuk",
-  "pesticide": "pestisida",
+  "cause": "penyebab dalam Bahasa Indonesia",
+  "cause_detail": "detail penyebab dalam Bahasa Indonesia",
+  "description": "deskripsi dalam Bahasa Indonesia",
+  "symptoms": ["gejala 1 dalam Bahasa Indonesia", "gejala 2 dalam Bahasa Indonesia"],
+  "initial_action": "tindakan awal dalam Bahasa Indonesia",
+  "solution": "solusi dalam Bahasa Indonesia",
+  "follow_up": "tindak lanjut dalam Bahasa Indonesia",
+  "fertilizer": "pupuk dalam Bahasa Indonesia",
+  "pesticide": "pestisida dalam Bahasa Indonesia",
   "recovery_days": 14,
   "weather_note": null,
   "confidence_note": null
@@ -274,7 +286,7 @@ export async function getContextualRecommendations(input: {
     .map((p) => `${p.name} (${p.ageDays} HST, tanah: ${p.soilCondition})`)
     .join(", ");
 
-  const prompt = `Berikan 3 rekomendasi pertanian SPESIFIK dan ACTIONABLE.
+  const prompt = `Berikan 3 rekomendasi pertanian SPESIFIK dan ACTIONABLE dalam BAHASA INDONESIA.
 Tanaman: ${plantList}
 Cuaca: ${input.weatherSummary ?? "tidak diketahui"}
 Lokasi: ${input.userLocation ?? "tidak diketahui"}
@@ -285,7 +297,7 @@ JSON saja: {"recommendations": ["...", "...", "..."]}`;
   const content = await callAIWithRetry({
     systemPrompt: FARMING_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
-    maxTokens: 250,
+    maxTokens: 400,
   });
 
   try {
@@ -311,7 +323,7 @@ export async function getDiseaseWarnings(input: {
     .map((p) => `${p.name} (${p.ageDays} HST, tanah: ${p.soilCondition})`)
     .join(", ");
 
-  const prompt = `Analisis risiko penyakit tanaman. Hanya beri peringatan jika risiko nyata.
+  const prompt = `Analisis risiko penyakit tanaman dalam BAHASA INDONESIA. Hanya beri peringatan jika risiko nyata.
 Tanaman: ${plantList}
 Cuaca: ${input.weatherCondition}, kelembapan ${input.humidity}%, hujan ${input.rainfall}mm
 
@@ -320,7 +332,7 @@ JSON saja: {"warnings": [{"plant": "...", "risk": "...", "message": "...", "seve
   const content = await callAIWithRetry({
     systemPrompt: FARMING_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
-    maxTokens: 300,
+    maxTokens: 450,
   });
 
   try {
@@ -400,7 +412,7 @@ export function parseMarkdown(text: string): string {
 }
 
 // Generate konten artikel dengan AI
-const ARTICLE_GEN_SYSTEM_PROMPT = `Anda penulis artikel pertanian Indonesia. Buat artikel HTML yang natural dan mudah dipahami petani.
+const ARTICLE_GEN_SYSTEM_PROMPT = `Anda penulis artikel pertanian Indonesia. WAJIB menulis dalam BAHASA INDONESIA. Buat artikel HTML yang natural dan mudah dipahami petani.
 
 FORMAT WAJIB:
 - Gunakan <h2>, <h3>, <p>, <ul><li> — JANGAN markdown (#, **, -)
@@ -416,7 +428,7 @@ export async function generateArticleContent(input: {
 }): Promise<string> {
   const { title, excerpt, category } = input;
 
-  const prompt = `Buat artikel pertanian:
+  const prompt = `Buat artikel pertanian dalam BAHASA INDONESIA:
 Judul: ${title}
 ${excerpt ? `Ringkasan: ${excerpt}` : ""}
 ${category ? `Kategori: ${category}` : ""}
@@ -427,7 +439,7 @@ Output HTML langsung, tanpa \`\`\` atau pembungkus. Contoh:
   const content = await callAIWithRetry({
     systemPrompt: ARTICLE_GEN_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
-    maxTokens: 800,
+    maxTokens: 1200,
   });
 
   let cleaned = content

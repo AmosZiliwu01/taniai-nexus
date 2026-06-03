@@ -1,5 +1,5 @@
 // src/services/ai/providers/groq.ts
-export const GROQ_MODEL_TEXT = "qwen/qwen3-32b";
+export const GROQ_MODEL_TEXT = "llama-3.3-70b-versatile";
 export const GROQ_MODEL_VISION = "meta-llama/llama-4-scout-17b-16e-instruct";
 
 export interface AIMessage {
