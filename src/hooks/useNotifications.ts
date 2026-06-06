@@ -176,6 +176,17 @@ export function formatNotificationBody(body: string | null): string {
 
   const parsed = parseBody(body);
 
+  // KHUSUS UNTUK LAPORAN (REPORT) - TAMPILKAN PESAN YANG LEBIH BERSIH
+  if (parsed.type === "report" || parsed.reason) {
+    const reason = parsed.reason || "Tidak ada alasan";
+    const postIdShort = parsed.post_id ? parsed.post_id.slice(0, 8) + "..." : "";
+    
+    if (parsed.type === "report") {
+      return `Laporan: ${reason}${postIdShort ? ` (Post: ${postIdShort})` : ""}`;
+    }
+    return `Laporan konten: ${reason}`;
+  }
+
   if (parsed.message && (parsed.action === "approved" || parsed.reason)) {
     return parsed.message;
   }
@@ -186,7 +197,23 @@ export function formatNotificationBody(body: string | null): string {
     return parsed.message;
   }
   if (parsed.raw) {
-    return parsed.raw.replace(/POST_ID:[a-f0-9-]+\n?/, "").trim();
+    let cleaned = parsed.raw
+      .replace(/POST_ID:[a-f0-9-]+\n?/gi, "")
+      .replace(/^\{.*"type":.*"report".*\}$/, "")
+      .trim();
+    if (cleaned) return cleaned;
+  }
+
+  // Jika body masih terlihat seperti JSON report, coba ekstrak
+  if (body.trim().startsWith("{") && body.includes("report")) {
+    try {
+      const obj = JSON.parse(body);
+      if (obj.reason) return `Laporan: ${obj.reason}`;
+      if (obj.message) return obj.message;
+    } catch {
+      // lanjut ke default
+    }
+    return "Laporan konten baru";
   }
 
   return body.length > 100 ? body.substring(0, 100) + "..." : body;
