@@ -1198,36 +1198,40 @@ function DiagnosaTanaman() {
             imageUrl = supabase.storage.from("diagnoses").getPublicUrl(filename).data.publicUrl;
           else if (upErr) console.warn("Diagnoses storage warning:", upErr.message);
         }
-        await supabase.from("plant_diagnoses").insert({
-          user_id: user.id,
-          plant_type: finalPlant,
-          part_type: plantPart || null,
-          diagnosis: diagnosis.diagnosis,
-          severity: diagnosis.severity,
-          severity_score: diagnosis.severity_score,
-          confidence_score: diagnosis.confidence,
-          cause: diagnosis.cause || null,
-          cause_detail: diagnosis.cause_detail || null,
-          description: diagnosis.description,
-          symptoms: diagnosis.symptoms ? JSON.stringify(diagnosis.symptoms) : null,
-          solution: diagnosis.solution,
-          initial_action: diagnosis.initial_action,
-          follow_up: diagnosis.follow_up,
-          fertilizer: diagnosis.fertilizer || null,
-          pesticide: diagnosis.pesticide || null,
-          recovery_days: diagnosis.recovery_days || null,
-          image_url: imageUrl,
-          soil_condition: soilCondition,
-          weather_condition: weatherSummary,
-          location: location || null,
-          is_plant_image: diagnosis.is_plant_image,
-          detected_plant: diagnosis.detected_plant || null,
-          plant_match: diagnosis.plant_match || null,
-          plant_match_confidence: diagnosis.plant_match_confidence || null,
-          mismatch_warning: diagnosis.mismatch_warning || null,
-          confidence_note: diagnosis.confidence_note || null,
-          weather_note: diagnosis.weather_note || null,
-        });
+      const { error: insertError } = await supabase.from("plant_diagnoses").insert({
+  user_id: user.id,
+  plant_type: finalPlant,
+  part_type: plantPart || null,
+  diagnosis: diagnosis.diagnosis,
+  severity: diagnosis.severity,
+  severity_score: diagnosis.severity_score,
+  confidence_score: diagnosis.confidence,
+  cause: diagnosis.cause || null,
+  cause_detail: diagnosis.cause_detail || null,
+  description: diagnosis.description,
+  symptoms: diagnosis.symptoms ? JSON.stringify(diagnosis.symptoms) : null,
+  solution: diagnosis.solution,
+  initial_action: diagnosis.initial_action,
+  follow_up: diagnosis.follow_up,
+  fertilizer: diagnosis.fertilizer || null,
+  pesticide: diagnosis.pesticide || null,
+  recovery_days: diagnosis.recovery_days || null,
+  image_url: imageUrl,
+  soil_condition: soilCondition,
+  weather_condition: weatherSummary,
+  weather_note: diagnosis.weather_note || null,
+  is_plant_image: diagnosis.is_plant_image,
+  detected_plant: diagnosis.detected_plant || null,
+  plant_match: diagnosis.plant_match || null,
+  plant_match_confidence: diagnosis.plant_match_confidence || null,
+  mismatch_warning: diagnosis.mismatch_warning || null,
+  confidence_note: diagnosis.confidence_note || null,
+});
+
+if (insertError) {
+  console.error("❌ Insert error:", insertError);
+  throw new Error("Gagal menyimpan diagnosa: " + insertError.message);
+}
         setActiveImageUrl(imageUrl);
         qc.invalidateQueries({ queryKey: ["diagnoses"] });
         qc.invalidateQueries({ queryKey: ["recent-diagnoses-dashboard"] });
