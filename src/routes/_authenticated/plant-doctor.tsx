@@ -731,6 +731,7 @@ function DiagnosisCard({
   plantPart,
   onShare,
   onClose,
+  onAskAI,
 }: {
   result: DiagnosisResult;
   imageUrl?: string;
@@ -738,7 +739,8 @@ function DiagnosisCard({
   plantPart?: string;
   onShare?: () => void;
   onClose?: () => void;
-}) {
+  onAskAI?: () => void;
+}){
   const severityColor =
     result.severity === "Berat"
       ? "bg-destructive/5"
@@ -928,14 +930,12 @@ function DiagnosisCard({
             </Button>
           )}
           <Button
-            asChild
             variant="outline"
             size="sm"
             className="w-full gap-1.5 text-xs justify-center"
+            onClick={onAskAI}
           >
-            <Link to="/assistant">
-              <MessageCircle className="h-3.5 w-3.5" /> Tanya AI Lebih Lanjut
-            </Link>
+            <MessageCircle className="h-3.5 w-3.5" /> Tanya AI Lebih Lanjut
           </Button>
         </div>
       </div>
@@ -1291,6 +1291,8 @@ if (insertError) {
   });
 
   const handleSelectHistory = (d: any) => {
+    setPlantType(d.plant_type ?? "");
+    setPlantPart(d.part_type ?? ""); 
     const sev = d.severity as "Ringan" | "Sedang" | "Berat";
     const symptoms = d.symptoms ? JSON.parse(d.symptoms) : undefined;
     setActiveResult({
@@ -1574,6 +1576,27 @@ if (insertError) {
                 plantPart={plantPart}
                 onShare={handleShare}
                 onClose={() => setActiveResult(null)}
+                onAskAI={() => {
+                    if (!activeResult) return;
+                    const parts = [
+                      `Saya baru mendapat hasil diagnosa tanaman ${finalPlantLabel} bagian ${plantPart}:`,
+                      ``,
+                      `🔍 Diagnosis: ${activeResult.diagnosis}`,
+                      `📊 Tingkat keyakinan: ${activeResult.confidence}%`,
+                      `⚠️ Keparahan: ${activeResult.severity}`,
+                      `🦠 Penyebab: ${activeResult.cause}`,
+                      `📝 Deskripsi: ${activeResult.description}`,
+                    ];
+                    if (activeResult.symptoms?.length) {
+                      parts.push(`🌿 Gejala: ${activeResult.symptoms.join(", ")}`);
+                    }
+                    if (activeResult.initial_action) {
+                      parts.push(`⚡ Tindakan awal: ${activeResult.initial_action}`);
+                    }
+                    parts.push(``);
+                    parts.push(`Bisakah kamu jelaskan lebih lanjut dan berikan saran tambahan?`);
+                    navigate({ to: "/assistant", search: { q: parts.join("\n") } });
+                  }}
               />
             )}
 

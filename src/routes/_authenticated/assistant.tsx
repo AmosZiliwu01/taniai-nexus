@@ -246,6 +246,17 @@ function Assistant() {
     },
   });
 
+  const hasAutoSentRef = useRef(false);
+    useEffect(() => {
+      if (!prefilledQuery || hasAutoSentRef.current) return;
+      hasAutoSentRef.current = true;
+      const timer = setTimeout(() => {
+        sendMutation.mutate(prefilledQuery);
+        setInput("");
+      }, 500);
+      return () => clearTimeout(timer);
+    }, []);
+
   // Handle input change and auto-resize
   const handleSend = useCallback(() => {
     const text = input.trim();
