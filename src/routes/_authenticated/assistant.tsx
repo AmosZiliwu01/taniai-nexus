@@ -247,15 +247,15 @@ function Assistant() {
   });
 
   const hasAutoSentRef = useRef(false);
-    useEffect(() => {
-      if (!prefilledQuery || hasAutoSentRef.current) return;
-      hasAutoSentRef.current = true;
-      const timer = setTimeout(() => {
-        sendMutation.mutate(prefilledQuery);
-        setInput("");
-      }, 500);
-      return () => clearTimeout(timer);
-    }, []);
+  useEffect(() => {
+    if (!prefilledQuery || hasAutoSentRef.current) return;
+    hasAutoSentRef.current = true;
+    const timer = setTimeout(() => {
+      sendMutation.mutate(prefilledQuery);
+      setInput("");
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Handle input change and auto-resize
   const handleSend = useCallback(() => {
@@ -317,10 +317,10 @@ function Assistant() {
 
   // Auto scroll to bottom on new messages
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col lg:h-[calc(100vh-6rem)]">
-      <div className="grid flex-1 overflow-hidden lg:grid-cols-[280px_1fr]">
+    <div className="flex flex-col" style={{ height: "calc(100vh - 4rem)" }}>
+      <div className="grid flex-1 min-h-0 overflow-hidden lg:grid-cols-[280px_1fr]">
         {/* ── Sidebar (desktop) ── */}
-        <div className="hidden flex-col border-r border-border bg-card lg:flex">
+        <div className="hidden flex-col border-r border-border bg-card lg:flex min-h-0">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="font-semibold text-sm">Riwayat Chat</h2>
             <Button
@@ -370,7 +370,7 @@ function Assistant() {
         </div>
 
         {/* ── Chat area ── */}
-        <div className="flex flex-col overflow-hidden">
+        <div className="flex flex-col overflow-hidden min-h-0">
           {/* Mobile header */}
           <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
             <div className="flex items-center gap-2">
@@ -457,7 +457,7 @@ function Assistant() {
           )}
 
           {/* Messages area */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
             {/* Context bar */}
             {(location || weather) && (
               <div className="flex flex-wrap gap-1.5 text-[10px]">
@@ -579,7 +579,7 @@ function Assistant() {
           </div>
 
           {/* Input area */}
-          <div className="border-t border-border bg-card/50 backdrop-blur-sm p-3 pb-4">
+          <div className="shrink-0 border-t border-border bg-card/50 backdrop-blur-sm p-3 pb-4">
             <div className="flex items-center gap-2 rounded-2xl border border-input bg-background px-3 py-2.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all min-h-[44px]">
               <textarea
                 ref={inputRef}

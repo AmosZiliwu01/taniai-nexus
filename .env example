@@ -14,5 +14,5 @@ VITE_API_URL=http://localhost:3000
 
 # OpenWeather API Configuration
 
-VITE_OPENWEATHER_API_URL=https://api.openweathermap.org/data/2.5
+VITE_OPENWEATHER_API_URL=https://api.openweathermap.org
 VITE_OPENWEATHER_API_KEY=your-openweather-api-key
